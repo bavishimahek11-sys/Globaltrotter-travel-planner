@@ -34,6 +34,10 @@
     grid-template-columns: repeat(2, 1fr);
   }
 
+  .collaborators-grid {
+    grid-template-columns: 1fr;
+  }
+
   .map-container {
     height: 350px;
   }
@@ -82,7 +86,7 @@
     width: 100%;
   }
 
-  .suggestions-grid, .trips-grid {
+  .suggestions-grid, .trips-grid, .collaborators-grid {
     grid-template-columns: 1fr;
   }
 
@@ -112,7 +116,7 @@
     grid-template-columns: 1fr;
   }
 
-  .activity-card, .expense-card {
+  .activity-card, .expense-card, .collaborator-card {
     flex-direction: column;
     align-items: flex-start;
     padding: 1.15rem;
@@ -133,6 +137,10 @@
     border-top: 1px solid var(--border-color);
     padding-top: 0.75rem;
     margin-top: 0.75rem;
+  }
+
+  .share-link-group {
+    flex-direction: column;
   }
 
   .map-container {
@@ -158,7 +166,7 @@
     padding: 0 1rem;
   }
 
-  .stop-card, .activity-card, .trip-card, .expense-card {
+  .stop-card, .activity-card, .trip-card, .expense-card, .collaborator-card {
     padding: 1rem;
   }
 

@@ -37,7 +37,7 @@
   <section class="page-hero">
     <div class="container">
       <h1 id="pageHeroTitle">Trip Details & Itinerary</h1>
-      <p id="pageHeroSubtitle">Manage your day-by-day activities, track expenses, and explore your interactive route map.</p>
+      <p id="pageHeroSubtitle">Manage your day-by-day activities, track expenses, explore your route, and collaborate with travel companions.</p>
     </div>
   </section>
 
@@ -45,6 +45,12 @@
   <main class="main-content">
     <div class="container">
       
+      <!-- Read-Only Banner for Viewers (Phase 6) -->
+      <div id="readOnlyBanner" class="read-only-banner" style="display: none;">
+        <span>👀</span>
+        <span><strong>Read-Only Mode:</strong> You are viewing this shared trip as a <strong>Viewer</strong>. Editing controls are disabled.</span>
+      </div>
+
       <!-- Top Alert Notification Area -->
       <div id="pageAlertContainer"></div>
 
@@ -145,11 +151,33 @@
 
       </section>
 
+      <!-- 5. Phase 6: Trip Collaborators Section -->
+      <section id="collaboratorsSection" class="collaborators-section">
+        <div class="itinerary-section-header">
+          <div>
+            <h2 class="section-title">
+              <span>👥</span> Trip Collaborators
+            </h2>
+            <p class="section-subtitle" style="margin-bottom: 0;">Manage travel companions and assign viewer or editor permissions.</p>
+          </div>
+
+          <div>
+            <button type="button" id="openInviteModalBtn" class="btn btn-primary">
+              <span>+</span> Invite Collaborator
+            </button>
+          </div>
+        </div>
+
+        <div id="collaboratorsListContainer">
+          <!-- Rendered dynamically via js/itinerary.js -->
+        </div>
+      </section>
+
     </div>
   </main>
 
   <!-- =======================================================================
-       MODAL 1: ADD / EDIT ACTIVITY MODAL DIALOG (WITH LAT/LNG COORDINATES)
+       MODAL 1: ADD / EDIT ACTIVITY MODAL DIALOG
        ======================================================================= -->
   <div id="activityModal" class="modal-backdrop" aria-hidden="true">
     <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
@@ -194,7 +222,7 @@
             <input type="text" id="activityLocation" class="form-control" placeholder="e.g. Vadodara, Gujarat" required>
           </div>
 
-          <!-- Phase 5: Optional Coordinates for Map Placements -->
+          <!-- Optional Coordinates for Map Placements -->
           <div class="form-row">
             <div class="form-group">
               <label for="activityLat" class="form-label">
@@ -300,6 +328,87 @@
         </div>
       </form>
 
+    </div>
+  </div>
+
+  <!-- =======================================================================
+       MODAL 3: SHARE TRIP MODAL DIALOG (PHASE 6)
+       ======================================================================= -->
+  <div id="shareModal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="shareModalTitle">
+      <div class="modal-header">
+        <h3 id="shareModalTitle" class="modal-title">Share Trip Plan</h3>
+        <button type="button" id="closeShareModalBtn" class="modal-close-btn" aria-label="Close dialog">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div id="shareModalTripInfo" style="font-weight: 600; margin-bottom: 0.75rem;"></div>
+        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
+          Share this link with your travel companions to let them view the live itinerary, budget, and route map.
+        </p>
+
+        <label class="form-label"><span>🔗</span> Shareable Trip Link</label>
+        <div class="share-link-group">
+          <input type="text" id="shareLinkInput" class="form-control share-link-input" readonly>
+          <button type="button" id="copyShareLinkBtn" class="btn btn-primary copy-btn">
+            <span>📋</span> Copy Link
+          </button>
+        </div>
+        <div id="shareCopyFeedback" style="font-size: 0.85rem; margin-top: 0.5rem; min-height: 20px;"></div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" id="cancelShareModalBtn" class="btn btn-outline">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =======================================================================
+       MODAL 4: INVITE COLLABORATOR MODAL DIALOG (PHASE 6)
+       ======================================================================= -->
+  <div id="inviteModal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="inviteModalTitle">
+      <div class="modal-header">
+        <h3 id="inviteModalTitle" class="modal-title">Invite Trip Collaborator</h3>
+        <button type="button" id="closeInviteModalBtn" class="modal-close-btn" aria-label="Close dialog">✕</button>
+      </div>
+
+      <form id="inviteCollaboratorForm">
+        <div class="modal-body">
+          <div id="inviteModalAlertContainer"></div>
+
+          <div class="form-group">
+            <label for="inviteEmail" class="form-label">
+              <span>✉️</span> Collaborator Email <span style="color: var(--danger);">*</span>
+            </label>
+            <input type="email" id="inviteEmail" class="form-control" placeholder="companion@example.com" required>
+          </div>
+
+          <div class="form-group">
+            <label for="inviteName" class="form-label">
+              <span>👤</span> Name (Optional)
+            </label>
+            <input type="text" id="inviteName" class="form-control" placeholder="e.g. Rahul Sharma">
+          </div>
+
+          <div class="form-group">
+            <label for="inviteRole" class="form-label">
+              <span>🛡️</span> Permission Role <span style="color: var(--danger);">*</span>
+            </label>
+            <select id="inviteRole" class="form-control" required>
+              <option value="Editor">✏️ Editor — Can add & edit activities and expenses</option>
+              <option value="Viewer" selected>👀 Viewer — Read-only access to itinerary & budget</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" id="cancelInviteModalBtn" class="btn btn-outline">Cancel</button>
+          <button type="submit" id="sendInviteSubmitBtn" class="btn btn-primary">
+            <span>📨</span> Send Invitation
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 
