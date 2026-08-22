@@ -39,11 +39,8 @@
 
   <main class="main-content">
     <div class="container">
-      <div class="card" style="max-width: 800px; margin: 0 auto; text-align: center; padding: 3rem 2rem;">
-        <span class="state-icon">🎒</span>
-        <h2 style="font-size: 1.35rem; margin-bottom: 0.5rem;">Start Planning Your First Trip</h2>
-        <p style="color: var(--text-muted); margin-bottom: 1.5rem;">Use our Smart Stop Suggestions to discover great destinations along your route.</p>
-        <a href="create-trip.html" class="btn btn-primary"><span>✨</span> Create a Trip</a>
+      <div id="tripsContainer">
+        <!-- Rendered dynamically via js/trips.js -->
       </div>
     </div>
   </main>
@@ -56,5 +53,6 @@
 
   <script src="js/storage.js"></script>
   <script src="js/app.js"></script>
+  <script src="js/trips.js"></script>
 </body>
 </html>
