@@ -194,23 +194,29 @@ document.addEventListener('DOMContentLoaded', () => {
       let tripsGridHtml = '';
       trips.forEach(t => {
         const dest = t.destination || (t.fromCity && t.toCity ? `${t.fromCity} ➔ ${t.toCity}` : 'Destination');
+        const destCity = t.toCity || t.destination || t.title || 'Destination';
+        const destImg = typeof getDestinationImage === 'function' ? getDestinationImage(destCity) : 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?auto=format&fit=crop&w=800&q=80';
         const dates = (t.startDate && t.endDate) ? `${formatDate(t.startDate)} – ${formatDate(t.endDate)}` : (t.startDate ? formatDate(t.startDate) : 'Dates flexible');
         const actCount = t.itinerary && Array.isArray(t.itinerary) ? t.itinerary.length : 0;
 
         tripsGridHtml += `
           <div class="trip-card" style="border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.25rem; background: var(--bg-surface); display: flex; flex-direction: column; justify-content: space-between; gap: 1rem;">
             <div>
-              <h3 style="font-size: 1.15rem; margin-bottom: 0.35rem; color: var(--text-color);">${escapeHtml(t.title || t.name || 'Trip')}</h3>
-              <div style="color: var(--primary); font-size: 0.9rem; font-weight: 500; margin-bottom: 0.75rem;">📍 ${escapeHtml(dest)}</div>
-              <div style="font-size: 0.85rem; color: var(--text-muted); display: flex; flex-direction: column; gap: 0.25rem;">
+              <div class="trip-card-img-wrapper">
+                <img src="${destImg}" alt="${escapeHtml(t.title || 'Trip')}" class="trip-card-banner" loading="lazy">
+                <span class="trip-card-badge">📍 ${escapeHtml(t.toCity || destCity)}</span>
+              </div>
+              <h3 style="font-size: 1.15rem; margin-bottom: 0.35rem; color: var(--text-main);">${escapeHtml(t.title || t.name || 'Trip')}</h3>
+              <div style="color: var(--primary); font-size: 0.9rem; font-weight: 600; margin-bottom: 0.75rem;">📍 ${escapeHtml(dest)}</div>
+              <div style="font-size: 0.85rem; color: var(--text-muted); display: flex; flex-direction: column; gap: 0.3rem;">
                 <div>🗓️ <strong>Dates:</strong> ${dates}</div>
                 <div>⏱️ <strong>Duration:</strong> ${escapeHtml(t.duration || 'Flexible')}</div>
                 <div>📋 <strong>Activities:</strong> ${actCount} scheduled</div>
               </div>
             </div>
-            <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
-              <a href="itinerary.html?id=${encodeURIComponent(t.id)}" class="btn btn-sm btn-primary">
-                <span>📋</span> View Itinerary
+            <div style="display: flex; gap: 0.5rem; justify-content: flex-end; padding-top: 0.75rem; border-top: 1px solid var(--border-color);">
+              <a href="itinerary.html?id=${encodeURIComponent(t.id)}" class="btn btn-sm btn-primary" style="width: 100%;">
+                <span>📋</span> View Itinerary ➔
               </a>
             </div>
           </div>

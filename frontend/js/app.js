@@ -104,3 +104,36 @@ function escapeHtml(str) {
     "'": '&#39;'
   }[match]));
 }
+
+// Destination Photography Mapping for Visual Polish
+const DESTINATION_IMAGES = {
+  'mumbai': 'https://images.unsplash.com/photo-1570168007204-dfb528c6958f?auto=format&fit=crop&w=800&q=80',
+  'goa': 'https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?auto=format&fit=crop&w=800&q=80',
+  'jaipur': 'assets/images/jaipur.jpg',
+  'ahmedabad': 'assets/images/sabarmati_riverfront.jpg',
+  'sabarmati': 'assets/images/sabarmati_riverfront.jpg',
+  'delhi': 'https://images.unsplash.com/photo-1587474260584-136574528ed5?auto=format&fit=crop&w=800&q=80',
+  'bangalore': 'https://images.unsplash.com/photo-1596176530529-78163a4f7af2?auto=format&fit=crop&w=800&q=80',
+  'bengaluru': 'https://images.unsplash.com/photo-1596176530529-78163a4f7af2?auto=format&fit=crop&w=800&q=80',
+  'pune': 'https://images.unsplash.com/photo-1618083840940-27a3c333068e?auto=format&fit=crop&w=800&q=80',
+  'chennai': 'https://images.unsplash.com/photo-1582510003544-4d00b7f74220?auto=format&fit=crop&w=800&q=80',
+  'agra': 'https://images.unsplash.com/photo-1564507592333-c60657eea523?auto=format&fit=crop&w=800&q=80',
+  'udaipur': 'https://images.unsplash.com/photo-1615836245337-f5b9b2303f10?auto=format&fit=crop&w=800&q=80',
+  'vadodara': 'https://images.unsplash.com/photo-1599824619458-45213500962a?auto=format&fit=crop&w=800&q=80',
+  'surat': 'https://images.unsplash.com/photo-1599824619458-45213500962a?auto=format&fit=crop&w=800&q=80',
+  'lonavala': 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80',
+  'default': 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?auto=format&fit=crop&w=800&q=80'
+};
+
+function getDestinationImage(name) {
+  if (!name) return DESTINATION_IMAGES['default'];
+  const lower = String(name).toLowerCase();
+  for (const [key, url] of Object.entries(DESTINATION_IMAGES)) {
+    if (key !== 'default' && lower.includes(key)) {
+      return url;
+    }
+  }
+  return DESTINATION_IMAGES['default'];
+}
+
+window.getDestinationImage = getDestinationImage;

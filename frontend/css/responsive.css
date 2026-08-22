@@ -26,8 +26,20 @@
     padding: 2.25rem 0;
   }
 
+  .home-hero {
+    padding: 4rem 0 3.5rem;
+  }
+
   .page-hero h1 {
     font-size: 1.85rem;
+  }
+
+  .home-hero h1 {
+    font-size: 2.35rem;
+  }
+
+  .destinations-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .trip-stats-grid, .budget-grid-metrics {
@@ -45,6 +57,22 @@
 
 /* Mobile Devices (< 768px) */
 @media (max-width: 768px) {
+  .home-hero {
+    padding: 3.25rem 0 2.75rem;
+  }
+
+  .home-hero h1 {
+    font-size: 1.85rem;
+  }
+
+  .destinations-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .destination-photo-wrapper {
+    height: 175px;
+  }
+
   .navbar {
     height: 60px;
   }
