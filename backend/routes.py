@@ -264,3 +264,267 @@ def get_user_trips(user_id):
 
     finally:
         conn.close()
+
+@api.route("/api/trips/<int:trip_id>/destinations", methods=["POST"])
+def add_destination(trip_id):
+    data = request.get_json()
+
+    if not data:
+        return jsonify({
+            "error": "Request body is required"
+        }), 400
+
+    name = data.get("name")
+    city = data.get("city")
+    country = data.get("country")
+    visit_date = data.get("visit_date")
+    notes = data.get("notes")
+
+    if not name:
+        return jsonify({
+            "error": "Destination name is required"
+        }), 400
+
+    conn = get_db_connection()
+
+    try:
+        trip = conn.execute(
+            "SELECT id FROM trips WHERE id = ?",
+            (trip_id,)
+        ).fetchone()
+
+        if not trip:
+            return jsonify({
+                "error": "Trip not found"
+            }), 404
+
+        cursor = conn.execute("""
+            INSERT INTO destinations (
+                trip_id,
+                name,
+                city,
+                country,
+                visit_date,
+                notes
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            trip_id,
+            name,
+            city,
+            country,
+            visit_date,
+            notes
+        ))
+
+        conn.commit()
+
+        return jsonify({
+            "message": "Destination added successfully",
+            "destination": {
+                "id": cursor.lastrowid,
+                "trip_id": trip_id,
+                "name": name,
+                "city": city,
+                "country": country,
+                "visit_date": visit_date,
+                "notes": notes
+            }
+        }), 201
+
+    finally:
+        conn.close()
+
+@api.route("/api/trips/<int:trip_id>/destinations", methods=["GET"])
+def get_destinations(trip_id):
+    conn = get_db_connection()
+
+    try:
+        trip = conn.execute(
+            "SELECT id FROM trips WHERE id = ?",
+            (trip_id,)
+        ).fetchone()
+
+        if not trip:
+            return jsonify({
+                "error": "Trip not found"
+            }), 404
+
+        destinations = conn.execute("""
+            SELECT
+                id,
+                trip_id,
+                name,
+                city,
+                country,
+                visit_date,
+                notes
+            FROM destinations
+            WHERE trip_id = ?
+            ORDER BY visit_date ASC
+        """, (trip_id,)).fetchall()
+
+        return jsonify({
+            "destinations": [dict(destination) for destination in destinations]
+        }), 200
+
+    finally:
+        conn.close()
+
+@api.route("/api/trips/<int:trip_id>/itinerary", methods=["POST"])
+def add_itinerary_item(trip_id):
+    data = request.get_json()
+
+    if not data:
+        return jsonify({
+            "error": "Request body is required"
+        }), 400
+
+    activity = data.get("activity")
+    destination_id = data.get("destination_id")
+    activity_date = data.get("activity_date")
+    start_time = data.get("start_time")
+    end_time = data.get("end_time")
+    notes = data.get("notes")
+
+    if not activity:
+        return jsonify({
+            "error": "Activity is required"
+        }), 400
+
+    conn = get_db_connection()
+
+    try:
+        trip = conn.execute(
+            "SELECT id FROM trips WHERE id = ?",
+            (trip_id,)
+        ).fetchone()
+
+        if not trip:
+            return jsonify({
+                "error": "Trip not found"
+            }), 404
+
+        if destination_id:
+            destination = conn.execute("""
+                SELECT id
+                FROM destinations
+                WHERE id = ? AND trip_id = ?
+            """, (destination_id, trip_id)).fetchone()
+
+            if not destination:
+                return jsonify({
+                    "error": "Destination does not belong to this trip"
+                }), 400
+
+        cursor = conn.execute("""
+            INSERT INTO itinerary (
+                trip_id,
+                destination_id,
+                activity,
+                activity_date,
+                start_time,
+                end_time,
+                notes
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            trip_id,
+            destination_id,
+            activity,
+            activity_date,
+            start_time,
+            end_time,
+            notes
+        ))
+
+        conn.commit()
+
+        return jsonify({
+            "message": "Itinerary item added successfully",
+            "itinerary": {
+                "id": cursor.lastrowid,
+                "trip_id": trip_id,
+                "destination_id": destination_id,
+                "activity": activity,
+                "activity_date": activity_date,
+                "start_time": start_time,
+                "end_time": end_time,
+                "notes": notes
+            }
+        }), 201
+
+    finally:
+        conn.close()
+
+@api.route("/api/trips/<int:trip_id>/itinerary", methods=["GET"])
+def get_itinerary(trip_id):
+    conn = get_db_connection()
+
+    try:
+        trip = conn.execute(
+            "SELECT id FROM trips WHERE id = ?",
+            (trip_id,)
+        ).fetchone()
+
+        if not trip:
+            return jsonify({
+                "error": "Trip not found"
+            }), 404
+
+        itinerary = conn.execute("""
+            SELECT
+                itinerary.id,
+                itinerary.trip_id,
+                itinerary.destination_id,
+                itinerary.activity,
+                itinerary.activity_date,
+                itinerary.start_time,
+                itinerary.end_time,
+                itinerary.notes,
+                destinations.name AS destination_name
+            FROM itinerary
+            LEFT JOIN destinations
+                ON itinerary.destination_id = destinations.id
+            WHERE itinerary.trip_id = ?
+            ORDER BY
+                itinerary.activity_date ASC,
+                itinerary.start_time ASC
+        """, (trip_id,)).fetchall()
+
+        return jsonify({
+            "itinerary": [dict(item) for item in itinerary]
+        }), 200
+
+    finally:
+        conn.close()
+
+@api.route("/api/itinerary/<int:itinerary_id>", methods=["DELETE"])
+def delete_itinerary_item(itinerary_id):
+    conn = get_db_connection()
+
+    try:
+        item = conn.execute(
+            "SELECT id FROM itinerary WHERE id = ?",
+            (itinerary_id,)
+        ).fetchone()
+
+        if not item:
+            return jsonify({
+                "error": "Itinerary item not found"
+            }), 404
+
+        conn.execute(
+            "DELETE FROM itinerary WHERE id = ?",
+            (itinerary_id,)
+        )
+
+        conn.commit()
+
+        return jsonify({
+            "message": "Itinerary item deleted successfully"
+        }), 200
+
+    finally:
+        conn.close()
+

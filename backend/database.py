@@ -39,5 +39,36 @@ def init_db():
         )
     """)
 
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS destinations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            trip_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            city TEXT,
+            country TEXT,
+            visit_date TEXT,
+            notes TEXT,
+            FOREIGN KEY (trip_id) REFERENCES trips(id)
+            ON DELETE CASCADE
+        )
+    """)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS itinerary (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            trip_id INTEGER NOT NULL,
+            destination_id INTEGER,
+            activity TEXT NOT NULL,
+            activity_date TEXT,
+            start_time TEXT,
+            end_time TEXT,
+            notes TEXT,
+            FOREIGN KEY (trip_id) REFERENCES trips(id)
+            ON DELETE CASCADE,
+            FOREIGN KEY (destination_id) REFERENCES destinations(id)
+            ON DELETE SET NULL
+        )
+    """)
+
     conn.commit()
     conn.close()
