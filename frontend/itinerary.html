@@ -35,7 +35,7 @@
   <section class="page-hero">
     <div class="container">
       <h1 id="pageHeroTitle">Trip Details & Itinerary</h1>
-      <p id="pageHeroSubtitle">Manage your day-by-day activities, explore scheduled stops, and personalize your journey.</p>
+      <p id="pageHeroSubtitle">Manage your day-by-day activities, track expenses, and monitor your travel budget.</p>
     </div>
   </section>
 
@@ -76,30 +76,70 @@
 
       </section>
 
+      <!-- 3. Phase 4: Budget Tracking & Expense Management Section -->
+      <section id="budgetSection" class="budget-section">
+        
+        <div class="itinerary-section-header">
+          <div>
+            <h2 class="section-title">
+              <span>💰</span> Budget Tracking & Expenses
+            </h2>
+            <p class="section-subtitle" style="margin-bottom: 0;">Monitor your spending, manage expense entries, and stay within your travel budget.</p>
+          </div>
+
+          <div>
+            <button type="button" id="openAddExpenseBtn" class="btn btn-primary">
+              <span>+</span> Add Expense
+            </button>
+          </div>
+        </div>
+
+        <!-- Budget Summary Box with Progress Bar -->
+        <div id="budgetSummaryBox" class="budget-summary-card">
+          <!-- Rendered dynamically via js/itinerary.js -->
+        </div>
+
+        <!-- Category Breakdown -->
+        <div id="categoryBreakdownCard" class="categories-breakdown-card" style="display: none;">
+          <h3 class="section-title" style="font-size: 1.1rem;">
+            <span>📊</span> Expense Category Breakdown
+          </h3>
+          <div id="categoriesList" class="category-list">
+            <!-- Rendered dynamically via js/itinerary.js -->
+          </div>
+        </div>
+
+        <!-- Expense List Container -->
+        <div>
+          <h3 class="section-title" style="font-size: 1.15rem; margin-bottom: 1rem;">
+            <span>🧾</span> Recorded Expenses
+          </h3>
+          <div id="expensesContainer">
+            <!-- Rendered dynamically via js/itinerary.js -->
+          </div>
+        </div>
+
+      </section>
+
     </div>
   </main>
 
-  <!-- Add / Edit Activity Modal Dialog -->
+  <!-- =======================================================================
+       MODAL 1: ADD / EDIT ACTIVITY MODAL DIALOG
+       ======================================================================= -->
   <div id="activityModal" class="modal-backdrop" aria-hidden="true">
     <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
       
-      <!-- Modal Header -->
       <div class="modal-header">
         <h3 id="modalTitle" class="modal-title">Add Activity</h3>
         <button type="button" id="closeModalBtn" class="modal-close-btn" aria-label="Close dialog">✕</button>
       </div>
 
-      <!-- Modal Form Body -->
       <form id="activityForm">
         <div class="modal-body">
-          
-          <!-- Modal Validation Alerts -->
           <div id="modalAlertContainer"></div>
-
-          <!-- Hidden Input for Editing Item ID -->
           <input type="hidden" id="editingActivityId" value="">
 
-          <!-- Date & Time Row -->
           <div class="form-row">
             <div class="form-group">
               <label for="activityDate" class="form-label">
@@ -116,7 +156,6 @@
             </div>
           </div>
 
-          <!-- Activity Name -->
           <div class="form-group">
             <label for="activityName" class="form-label">
               <span>📌</span> Activity / Place Name <span style="color: var(--danger);">*</span>
@@ -124,7 +163,6 @@
             <input type="text" id="activityName" class="form-control" placeholder="e.g. Visit Laxmi Vilas Palace" required>
           </div>
 
-          <!-- Location -->
           <div class="form-group">
             <label for="activityLocation" class="form-label">
               <span>📍</span> Location <span style="color: var(--danger);">*</span>
@@ -132,21 +170,95 @@
             <input type="text" id="activityLocation" class="form-control" placeholder="e.g. Vadodara, Gujarat" required>
           </div>
 
-          <!-- Notes -->
           <div class="form-group">
             <label for="activityNotes" class="form-label">
               <span>📝</span> Notes & Sightseeing Details
             </label>
             <textarea id="activityNotes" class="form-control" rows="3" placeholder="Add entry ticket info, opening hours, or special tips..."></textarea>
           </div>
-
         </div>
 
-        <!-- Modal Footer Actions -->
         <div class="modal-footer">
           <button type="button" id="cancelModalBtn" class="btn btn-outline">Cancel</button>
           <button type="submit" id="saveActivitySubmitBtn" class="btn btn-primary">
             <span>💾</span> Save Activity
+          </button>
+        </div>
+      </form>
+
+    </div>
+  </div>
+
+  <!-- =======================================================================
+       MODAL 2: ADD / EDIT EXPENSE MODAL DIALOG (PHASE 4)
+       ======================================================================= -->
+  <div id="expenseModal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="expenseModalTitle">
+      
+      <div class="modal-header">
+        <h3 id="expenseModalTitle" class="modal-title">Add Expense</h3>
+        <button type="button" id="closeExpenseModalBtn" class="modal-close-btn" aria-label="Close dialog">✕</button>
+      </div>
+
+      <form id="expenseForm">
+        <div class="modal-body">
+          <div id="expenseModalAlertContainer"></div>
+          <input type="hidden" id="editingExpenseId" value="">
+
+          <!-- Expense Title -->
+          <div class="form-group">
+            <label for="expenseTitle" class="form-label">
+              <span>🏷️</span> Expense Title <span style="color: var(--danger);">*</span>
+            </label>
+            <input type="text" id="expenseTitle" class="form-control" placeholder="e.g. Hotel Stay, Train Tickets, Museum Entry" required>
+          </div>
+
+          <!-- Category & Amount Row -->
+          <div class="form-row">
+            <div class="form-group">
+              <label for="expenseCategory" class="form-label">
+                <span>📂</span> Category <span style="color: var(--danger);">*</span>
+              </label>
+              <select id="expenseCategory" class="form-control" required>
+                <option value="">-- Select Category --</option>
+                <option value="Transport">🚗 Transport</option>
+                <option value="Accommodation">🏨 Accommodation</option>
+                <option value="Food">🍽️ Food & Dining</option>
+                <option value="Activities">🎟️ Activities & Sights</option>
+                <option value="Shopping">🛍️ Shopping</option>
+                <option value="Other">📦 Other</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="expenseAmount" class="form-label">
+                <span>💰</span> Amount (₹) <span style="color: var(--danger);">*</span>
+              </label>
+              <input type="number" id="expenseAmount" class="form-control" placeholder="e.g. 2500" min="1" step="any" required>
+            </div>
+          </div>
+
+          <!-- Date -->
+          <div class="form-group">
+            <label for="expenseDate" class="form-label">
+              <span>🗓️</span> Date <span style="color: var(--danger);">*</span>
+            </label>
+            <input type="date" id="expenseDate" class="form-control" required>
+          </div>
+
+          <!-- Notes -->
+          <div class="form-group">
+            <label for="expenseNotes" class="form-label">
+              <span>📝</span> Notes (Optional)
+            </label>
+            <textarea id="expenseNotes" class="form-control" rows="2" placeholder="Payment mode, invoice info, or split details..."></textarea>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" id="cancelExpenseModalBtn" class="btn btn-outline">Cancel</button>
+          <button type="submit" id="saveExpenseSubmitBtn" class="btn btn-primary">
+            <span>💾</span> Save Expense
           </button>
         </div>
       </form>
