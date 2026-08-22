@@ -1,7 +1,7 @@
 /**
- * GlobalTrotter - Storage Helper
- * Manages active trip route and user-created trips in browser storage.
- * Strictly no fake users or hardcoded fake trips/itineraries.
+ * GlobalTrotter - Storage Helper (Phase 1, 3 & 4)
+ * Manages active trip route, user-created trips, itineraries, and expenses in browser storage.
+ * Strictly no fake users, fake trips, or hardcoded sample budget/expense data.
  */
 
 const ACTIVE_TRIP_KEY = 'globaltrotter_active_trip';
@@ -29,7 +29,8 @@ const Storage = {
         budget: '',
         duration: '',
         addedStops: [],
-        itinerary: []
+        itinerary: [],
+        expenses: []
       };
     } catch (e) {
       console.warn('Unable to access sessionStorage:', e);
@@ -44,7 +45,8 @@ const Storage = {
         budget: '',
         duration: '',
         addedStops: [],
-        itinerary: []
+        itinerary: [],
+        expenses: []
       };
     }
   },
@@ -166,6 +168,9 @@ const Storage = {
     if (!tripData.itinerary) {
       tripData.itinerary = [];
     }
+    if (!tripData.expenses) {
+      tripData.expenses = [];
+    }
 
     const index = trips.findIndex(t => String(t.id) === String(tripData.id));
     if (index >= 0) {
@@ -232,6 +237,65 @@ const Storage = {
     if (!trip || !trip.itinerary) return false;
 
     trip.itinerary = trip.itinerary.filter(i => String(i.id) !== String(itemId));
+    this.saveTrip(trip);
+    return true;
+  },
+
+  // ==========================================================================
+  // EXPENSE & BUDGET CRUD OPERATIONS (PHASE 4)
+  // ==========================================================================
+
+  /**
+   * Get all expenses for a trip
+   */
+  getTripExpenses(tripId) {
+    const trip = this.getTripById(tripId);
+    return (trip && trip.expenses) ? trip.expenses : [];
+  },
+
+  /**
+   * Add an expense record to a trip
+   */
+  addExpense(tripId, expense) {
+    const trip = this.getTripById(tripId);
+    if (!trip) return null;
+
+    if (!trip.expenses) trip.expenses = [];
+    expense.id = 'exp_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+    expense.amount = Number(expense.amount) || 0;
+    trip.expenses.push(expense);
+
+    this.saveTrip(trip);
+    return expense;
+  },
+
+  /**
+   * Update an existing expense record in a trip
+   */
+  updateExpense(tripId, expenseId, updatedData) {
+    const trip = this.getTripById(tripId);
+    if (!trip || !trip.expenses) return null;
+
+    const index = trip.expenses.findIndex(e => String(e.id) === String(expenseId));
+    if (index >= 0) {
+      if (updatedData.amount !== undefined) {
+        updatedData.amount = Number(updatedData.amount) || 0;
+      }
+      trip.expenses[index] = { ...trip.expenses[index], ...updatedData };
+      this.saveTrip(trip);
+      return trip.expenses[index];
+    }
+    return null;
+  },
+
+  /**
+   * Delete an expense record from a trip
+   */
+  deleteExpense(tripId, expenseId) {
+    const trip = this.getTripById(tripId);
+    if (!trip || !trip.expenses) return false;
+
+    trip.expenses = trip.expenses.filter(e => String(e.id) !== String(expenseId));
     this.saveTrip(trip);
     return true;
   }

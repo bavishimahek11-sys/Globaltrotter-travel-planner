@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Trip Budget - GlobalTrotter</title>
+  <title>Trip Budget & Expense Tracker - GlobalTrotter</title>
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/responsive.css">
 </head>
@@ -32,20 +32,119 @@
 
   <section class="page-hero">
     <div class="container">
-      <h1>Budget Estimator</h1>
-      <p>Estimate expenses for your route and intermediate stops.</p>
+      <h1 id="budgetHeroTitle">Budget & Expense Tracker</h1>
+      <p>Monitor your trip budget, track category spending, and view remaining balances.</p>
     </div>
   </section>
 
   <main class="main-content">
     <div class="container">
-      <div class="card" style="max-width: 800px; margin: 0 auto;">
-        <h2 class="section-title"><span>💰</span> Trip Expense Breakdown</h2>
-        <p class="section-subtitle">Estimated costs based on your active trip stops</p>
-        <div id="budgetContent"></div>
+      
+      <div id="budgetPageAlertContainer"></div>
+
+      <div class="card" style="max-width: 900px; margin: 0 auto;">
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+          <div>
+            <h2 class="section-title"><span>💰</span> Budget Overview</h2>
+            <div id="budgetTripSubtitle" style="color: var(--text-muted); font-size: 0.95rem;"></div>
+          </div>
+          <div>
+            <button type="button" id="budgetOpenAddExpenseBtn" class="btn btn-primary btn-sm">
+              <span>+</span> Add Expense
+            </button>
+          </div>
+        </div>
+
+        <div id="budgetMetricsContainer">
+          <!-- Rendered dynamically via js/budget.js -->
+        </div>
+
+        <div id="budgetCategoryBreakdownContainer" class="categories-breakdown-card" style="margin-top: 1.5rem; display: none;">
+          <h3 class="section-title" style="font-size: 1.1rem;"><span>📊</span> Spending by Category</h3>
+          <div id="budgetCategoriesList" class="category-list"></div>
+        </div>
+
+        <div style="margin-top: 2rem;">
+          <h3 class="section-title" style="font-size: 1.15rem; margin-bottom: 1rem;"><span>🧾</span> Expense Breakdown</h3>
+          <div id="budgetExpensesListContainer"></div>
+        </div>
+
       </div>
+
     </div>
   </main>
+
+  <!-- Add / Edit Expense Modal Dialog -->
+  <div id="budgetExpenseModal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="budgetModalTitle">
+      
+      <div class="modal-header">
+        <h3 id="budgetModalTitle" class="modal-title">Add Expense</h3>
+        <button type="button" id="budgetCloseModalBtn" class="modal-close-btn" aria-label="Close dialog">✕</button>
+      </div>
+
+      <form id="budgetExpenseForm">
+        <div class="modal-body">
+          <div id="budgetModalAlertContainer"></div>
+          <input type="hidden" id="budgetEditingExpenseId" value="">
+
+          <div class="form-group">
+            <label for="bExpenseTitle" class="form-label">
+              <span>🏷️</span> Expense Title <span style="color: var(--danger);">*</span>
+            </label>
+            <input type="text" id="bExpenseTitle" class="form-control" placeholder="e.g. Hotel Booking, Fuel, Lunch" required>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="bExpenseCategory" class="form-label">
+                <span>📂</span> Category <span style="color: var(--danger);">*</span>
+              </label>
+              <select id="bExpenseCategory" class="form-control" required>
+                <option value="">-- Select Category --</option>
+                <option value="Transport">🚗 Transport</option>
+                <option value="Accommodation">🏨 Accommodation</option>
+                <option value="Food">🍽️ Food & Dining</option>
+                <option value="Activities">🎟️ Activities & Sights</option>
+                <option value="Shopping">🛍️ Shopping</option>
+                <option value="Other">📦 Other</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="bExpenseAmount" class="form-label">
+                <span>💰</span> Amount (₹) <span style="color: var(--danger);">*</span>
+              </label>
+              <input type="number" id="bExpenseAmount" class="form-control" placeholder="e.g. 2000" min="1" step="any" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="bExpenseDate" class="form-label">
+              <span>🗓️</span> Date <span style="color: var(--danger);">*</span>
+            </label>
+            <input type="date" id="bExpenseDate" class="form-control" required>
+          </div>
+
+          <div class="form-group">
+            <label for="bExpenseNotes" class="form-label">
+              <span>📝</span> Notes (Optional)
+            </label>
+            <textarea id="bExpenseNotes" class="form-control" rows="2" placeholder="Add receipt notes or comments..."></textarea>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" id="budgetCancelModalBtn" class="btn btn-outline">Cancel</button>
+          <button type="submit" id="budgetSaveExpenseSubmitBtn" class="btn btn-primary">
+            <span>💾</span> Save Expense
+          </button>
+        </div>
+      </form>
+
+    </div>
+  </div>
 
   <footer class="site-footer">
     <div class="container">

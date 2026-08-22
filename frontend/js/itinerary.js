@@ -1,16 +1,17 @@
 /**
- * GlobalTrotter - Trip Details & Itinerary Page JS (Phase 3)
+ * GlobalTrotter - Trip Details, Itinerary & Budget JS (Phase 3 & 4)
  *
  * Manages rendering of dynamic trip details, grouped day-by-day activities,
- * activity creation/editing/deletion, and modal interaction.
+ * activity creation/editing/deletion, dynamic budget calculations, expense tracking,
+ * visual progress indicators, and category breakdowns.
  *
- * NOTE: Strictly no fake users, no fake trips, and no hardcoded demo activities.
+ * NOTE: Strictly no fake users, no fake trips, and no hardcoded demo budget/expense data.
  *
  * ============================================================================
  * EXPECTED BACKEND REST API SPECIFICATION (For Future Backend Integration)
  * ============================================================================
  * 
- * 1. Get Trip Details with Itinerary:
+ * 1. Get Trip Details with Itinerary & Expenses:
  *    GET /api/trips/:id
  *    Response: {
  *      id: "trip_123",
@@ -20,27 +21,27 @@
  *      toCity: "Mumbai",
  *      startDate: "2026-09-10",
  *      endDate: "2026-09-14",
- *      budget: 15000,
+ *      budget: 20000,
  *      duration: "5 days",
- *      addedStops: [{ city: "Vadodara", category: "Heritage • Food", duration: "4–6 hours" }],
+ *      addedStops: [...],
  *      itinerary: [
  *        { id: "act_1", date: "2026-09-10", time: "09:00", activity: "Palace Visit", location: "Vadodara", notes: "Sightseeing" }
+ *      ],
+ *      expenses: [
+ *        { id: "exp_1", title: "Train Tickets", category: "Transport", amount: 2500, date: "2026-09-10", notes: "Expressway coach" }
  *      ]
  *    }
  *
- * 2. Add Itinerary Activity:
- *    POST /api/trips/:id/itinerary
- *    Body: { date: "2026-09-10", time: "09:00", activity: "Palace Visit", location: "Vadodara", notes: "Sightseeing" }
- *    Response: 201 Created -> { id: "act_1", ... }
+ * 2. Itinerary Endpoints:
+ *    POST /api/trips/:id/itinerary -> Add activity (Body: { date, time, activity, location, notes })
+ *    PUT /api/trips/:id/itinerary/:activityId -> Update activity
+ *    DELETE /api/trips/:id/itinerary/:activityId -> Delete activity
  *
- * 3. Update Itinerary Activity:
- *    PUT /api/trips/:id/itinerary/:activityId
- *    Body: { date: "2026-09-10", time: "10:00", activity: "Updated Activity", location: "Vadodara", notes: "Updated notes" }
- *    Response: 200 OK -> { id: "act_1", ... }
- *
- * 4. Delete Itinerary Activity:
- *    DELETE /api/trips/:id/itinerary/:activityId
- *    Response: 204 No Content
+ * 3. Expense Management Endpoints (Phase 4):
+ *    GET /api/trips/:id/expenses -> List expenses for trip
+ *    POST /api/trips/:id/expenses -> Add expense (Body: { title, category, amount, date, notes })
+ *    PUT /api/trips/:id/expenses/:expenseId -> Update expense (Body: { title, category, amount, date, notes })
+ *    DELETE /api/trips/:id/expenses/:expenseId -> Delete expense
  * ============================================================================
  */
 
@@ -48,10 +49,14 @@ document.addEventListener('DOMContentLoaded', () => {
   // DOM Elements
   const tripSummaryCard = document.getElementById('tripSummaryCard');
   const itineraryDaysContainer = document.getElementById('itineraryDaysContainer');
+  const budgetSummaryBox = document.getElementById('budgetSummaryBox');
+  const categoryBreakdownCard = document.getElementById('categoryBreakdownCard');
+  const categoriesList = document.getElementById('categoriesList');
+  const expensesContainer = document.getElementById('expensesContainer');
   const pageHeroTitle = document.getElementById('pageHeroTitle');
   const pageAlertContainer = document.getElementById('pageAlertContainer');
   
-  // Modal Elements
+  // Activity Modal Elements
   const activityModal = document.getElementById('activityModal');
   const openAddActivityBtn = document.getElementById('openAddActivityBtn');
   const closeModalBtn = document.getElementById('closeModalBtn');
@@ -67,7 +72,23 @@ document.addEventListener('DOMContentLoaded', () => {
   const activityNotesInput = document.getElementById('activityNotes');
   const saveActivitySubmitBtn = document.getElementById('saveActivitySubmitBtn');
 
-  // 1. Get Target Trip
+  // Expense Modal Elements (Phase 4)
+  const expenseModal = document.getElementById('expenseModal');
+  const openAddExpenseBtn = document.getElementById('openAddExpenseBtn');
+  const closeExpenseModalBtn = document.getElementById('closeExpenseModalBtn');
+  const cancelExpenseModalBtn = document.getElementById('cancelExpenseModalBtn');
+  const expenseForm = document.getElementById('expenseForm');
+  const expenseModalTitle = document.getElementById('expenseModalTitle');
+  const expenseModalAlertContainer = document.getElementById('expenseModalAlertContainer');
+  const editingExpenseIdInput = document.getElementById('editingExpenseId');
+  const expenseTitleInput = document.getElementById('expenseTitle');
+  const expenseCategoryInput = document.getElementById('expenseCategory');
+  const expenseAmountInput = document.getElementById('expenseAmount');
+  const expenseDateInput = document.getElementById('expenseDate');
+  const expenseNotesInput = document.getElementById('expenseNotes');
+  const saveExpenseSubmitBtn = document.getElementById('saveExpenseSubmitBtn');
+
+  // Target Trip
   const urlParams = new URLSearchParams(window.location.search);
   const tripId = urlParams.get('id') || 'active';
   let currentTrip = Storage.getTripById(tripId);
@@ -75,10 +96,11 @@ document.addEventListener('DOMContentLoaded', () => {
   // Initialize Page
   renderTripDetails();
   renderItinerary();
+  renderBudgetAndExpenses();
   setupEventListeners();
 
   // ==========================================================================
-  // RENDER TRIP DETAILS SUMMARY
+  // 1. RENDER TRIP DETAILS SUMMARY
   // ==========================================================================
   function renderTripDetails() {
     if (!tripSummaryCard) return;
@@ -95,10 +117,12 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       `;
       if (openAddActivityBtn) openAddActivityBtn.style.display = 'none';
+      if (openAddExpenseBtn) openAddExpenseBtn.style.display = 'none';
       return;
     }
 
     if (openAddActivityBtn) openAddActivityBtn.style.display = 'inline-flex';
+    if (openAddExpenseBtn) openAddExpenseBtn.style.display = 'inline-flex';
 
     const title = currentTrip.title || `Trip to ${currentTrip.toCity || currentTrip.destination || 'Destination'}`;
     const destination = currentTrip.destination || (currentTrip.fromCity && currentTrip.toCity ? `${currentTrip.fromCity} ➔ ${currentTrip.toCity}` : 'Custom Destination');
@@ -140,7 +164,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
 
         <div class="stat-card">
-          <span class="stat-label">Estimated Budget</span>
+          <span class="stat-label">Total Trip Budget</span>
           <span class="stat-value">💰 ${budget}</span>
         </div>
 
@@ -153,12 +177,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================================================
-  // RENDER ITINERARY ACTIVITIES (GROUPED BY DAY / DATE)
+  // 2. RENDER ITINERARY ACTIVITIES (GROUPED BY DAY / DATE)
   // ==========================================================================
   function renderItinerary() {
     if (!itineraryDaysContainer) return;
 
-    // Refresh current trip state
     currentTrip = Storage.getTripById(tripId);
 
     if (!currentTrip || (!currentTrip.fromCity && !currentTrip.toCity && !currentTrip.title)) {
@@ -168,7 +191,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const activities = currentTrip.itinerary || [];
 
-    // Empty state
     if (activities.length === 0) {
       itineraryDaysContainer.innerHTML = `
         <div class="state-box">
@@ -198,7 +220,6 @@ document.addEventListener('DOMContentLoaded', () => {
       const formattedDate = dateKey === 'unspecified' ? 'Flexible Date' : formatDateLong(dateKey);
       const dayActivities = grouped[dateKey];
 
-      // Sort day activities by time
       dayActivities.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
 
       html += `
@@ -264,65 +285,267 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================================================
-  // MODAL & FORM INTERACTIONS (ADD / EDIT / DELETE)
+  // 3. RENDER BUDGET TRACKING & EXPENSES (PHASE 4)
+  // ==========================================================================
+  function renderBudgetAndExpenses() {
+    if (!budgetSummaryBox || !expensesContainer) return;
+
+    currentTrip = Storage.getTripById(tripId);
+
+    if (!currentTrip || (!currentTrip.fromCity && !currentTrip.toCity && !currentTrip.title)) {
+      budgetSummaryBox.innerHTML = '';
+      expensesContainer.innerHTML = '';
+      if (categoryBreakdownCard) categoryBreakdownCard.style.display = 'none';
+      return;
+    }
+
+    const totalBudget = Number(currentTrip.budget) || 0;
+    const expenses = currentTrip.expenses || [];
+    const totalExpenses = expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+    
+    const remainingBudget = totalBudget > 0 ? (totalBudget - totalExpenses) : 0;
+    const percentageUsed = totalBudget > 0 ? Math.round((totalExpenses / totalBudget) * 100) : 0;
+    const isExceeded = totalBudget > 0 && totalExpenses > totalBudget;
+    const exceededAmount = isExceeded ? (totalExpenses - totalBudget) : 0;
+
+    // A. Render Budget Summary Box
+    let progressClass = '';
+    if (isExceeded || percentageUsed >= 100) {
+      progressClass = 'danger';
+    } else if (percentageUsed >= 80) {
+      progressClass = 'warning';
+    }
+
+    const progressFillWidth = Math.min(percentageUsed, 100);
+
+    budgetSummaryBox.innerHTML = `
+      <div class="budget-grid-metrics">
+        <div class="budget-metric-box metric-primary">
+          <div class="budget-metric-title">Total Budget</div>
+          <div class="budget-metric-value">${totalBudget > 0 ? `₹${totalBudget.toLocaleString()}` : 'Not set'}</div>
+        </div>
+
+        <div class="budget-metric-box metric-spent">
+          <div class="budget-metric-title">Total Expenses</div>
+          <div class="budget-metric-value">₹${totalExpenses.toLocaleString()}</div>
+        </div>
+
+        <div class="budget-metric-box ${isExceeded ? 'metric-exceeded' : 'metric-remaining'}">
+          <div class="budget-metric-title">${isExceeded ? 'Budget Exceeded By' : 'Remaining Budget'}</div>
+          <div class="budget-metric-value" style="${isExceeded ? 'color: var(--danger);' : ''}">
+            ${isExceeded ? `⚠️ ₹${exceededAmount.toLocaleString()}` : (totalBudget > 0 ? `₹${remainingBudget.toLocaleString()}` : 'N/A')}
+          </div>
+        </div>
+
+        <div class="budget-metric-box ${isExceeded ? 'metric-exceeded' : ''}">
+          <div class="budget-metric-title">Budget Used</div>
+          <div class="budget-metric-value" style="${isExceeded ? 'color: var(--danger);' : ''}">
+            ${totalBudget > 0 ? `${percentageUsed}%` : 'N/A'}
+          </div>
+        </div>
+      </div>
+
+      ${isExceeded ? `
+        <div class="alert alert-danger" style="margin-bottom: 1.25rem;">
+          <span>⚠️</span>
+          <div><strong>Budget exceeded!</strong> Your total expenses have exceeded your planned budget by <strong>₹${exceededAmount.toLocaleString()}</strong>.</div>
+        </div>
+      ` : ''}
+
+      ${totalBudget > 0 ? `
+        <div class="budget-progress-section">
+          <div class="progress-header">
+            <span>Budget Utilization</span>
+            <span>${percentageUsed}% Used</span>
+          </div>
+          <div class="progress-bar-container">
+            <div class="progress-bar-fill ${progressClass}" style="width: ${progressFillWidth}%;"></div>
+          </div>
+        </div>
+      ` : `
+        <div class="alert alert-warning" style="margin-top: 1rem; margin-bottom: 0;">
+          <span>💡</span>
+          <div>Set a total trip budget during trip creation to see active percentage utilization and remaining balance.</div>
+        </div>
+      `}
+    `;
+
+    // B. Render Category Breakdown
+    if (expenses.length > 0 && categoryBreakdownCard && categoriesList) {
+      categoryBreakdownCard.style.display = 'block';
+      
+      const categoriesMap = {
+        'Transport': { label: '🚗 Transport', count: 0, sum: 0, class: 'transport' },
+        'Accommodation': { label: '🏨 Accommodation', count: 0, sum: 0, class: 'accommodation' },
+        'Food': { label: '🍽️ Food & Dining', count: 0, sum: 0, class: 'food' },
+        'Activities': { label: '🎟️ Activities & Sights', count: 0, sum: 0, class: 'activities' },
+        'Shopping': { label: '🛍️ Shopping', count: 0, sum: 0, class: 'shopping' },
+        'Other': { label: '📦 Other', count: 0, sum: 0, class: 'other' }
+      };
+
+      expenses.forEach(e => {
+        const cat = e.category || 'Other';
+        if (!categoriesMap[cat]) {
+          categoriesMap[cat] = { label: `📦 ${cat}`, count: 0, sum: 0, class: 'other' };
+        }
+        categoriesMap[cat].count += 1;
+        categoriesMap[cat].sum += (Number(e.amount) || 0);
+      });
+
+      let catHtml = '';
+      Object.keys(categoriesMap).forEach(key => {
+        const catData = categoriesMap[key];
+        if (catData.sum > 0) {
+          const catPct = totalExpenses > 0 ? Math.round((catData.sum / totalExpenses) * 100) : 0;
+          catHtml += `
+            <div class="category-item">
+              <div class="category-item-header">
+                <span>${catData.label} (${catData.count} ${catData.count === 1 ? 'item' : 'items'})</span>
+                <span>₹${catData.sum.toLocaleString()} (${catPct}%)</span>
+              </div>
+              <div class="category-track">
+                <div class="category-fill ${catData.class}" style="width: ${catPct}%;"></div>
+              </div>
+            </div>
+          `;
+        }
+      });
+
+      categoriesList.innerHTML = catHtml || '<p style="color: var(--text-muted); font-size: 0.875rem;">No category data.</p>';
+    } else if (categoryBreakdownCard) {
+      categoryBreakdownCard.style.display = 'none';
+    }
+
+    // C. Render Expenses List
+    if (expenses.length === 0) {
+      expensesContainer.innerHTML = `
+        <div class="state-box" style="padding: 2.5rem 1.5rem;">
+          <span class="state-icon">💸</span>
+          <div class="state-title">No expenses recorded yet.</div>
+          <div class="state-desc">Keep track of your travel spending by logging transport, hotel, food, and activity costs.</div>
+          <button type="button" class="btn btn-primary btn-add-first-expense">
+            <span>+</span> Add Expense
+          </button>
+        </div>
+      `;
+
+      const addFirstExpBtn = expensesContainer.querySelector('.btn-add-first-expense');
+      if (addFirstExpBtn) {
+        addFirstExpBtn.addEventListener('click', openAddExpenseModal);
+      }
+      return;
+    }
+
+    let expHtml = '<div class="expenses-grid">';
+    expenses.forEach(item => {
+      const catClass = (item.category || 'other').toLowerCase();
+      expHtml += `
+        <div class="expense-card" data-id="${escapeHtml(item.id)}">
+          <div class="expense-info">
+            <div class="expense-title-row">
+              <span class="expense-title">${escapeHtml(item.title)}</span>
+              <span class="badge-category ${escapeHtml(catClass)}">${escapeHtml(item.category || 'Other')}</span>
+            </div>
+            <div class="expense-meta">
+              <span>🗓️ ${formatDate(item.date)}</span>
+              ${item.notes ? ` • <span>${escapeHtml(item.notes)}</span>` : ''}
+            </div>
+          </div>
+
+          <div class="expense-amount-box">
+            <div class="expense-amount">₹${Number(item.amount).toLocaleString()}</div>
+            <div class="activity-actions">
+              <button type="button" class="btn-icon btn-edit-expense" data-id="${escapeHtml(item.id)}" title="Edit expense">
+                <span>✏️</span> Edit
+              </button>
+              <button type="button" class="btn-icon btn-icon-danger btn-delete-expense" data-id="${escapeHtml(item.id)}" title="Delete expense">
+                <span>🗑️</span> Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    });
+    expHtml += '</div>';
+
+    expensesContainer.innerHTML = expHtml;
+
+    // Attach Event Listeners to Expense Edit & Delete Buttons
+    expensesContainer.querySelectorAll('.btn-edit-expense').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const expId = btn.getAttribute('data-id');
+        openEditExpenseModal(expId);
+      });
+    });
+
+    expensesContainer.querySelectorAll('.btn-delete-expense').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const expId = btn.getAttribute('data-id');
+        handleDeleteExpense(expId);
+      });
+    });
+  }
+
+  // ==========================================================================
+  // 4. EVENT LISTENERS SETUP
   // ==========================================================================
   function setupEventListeners() {
-    if (openAddActivityBtn) {
-      openAddActivityBtn.addEventListener('click', openAddModal);
-    }
+    // Activity Modal Listeners
+    if (openAddActivityBtn) openAddActivityBtn.addEventListener('click', openAddModal);
+    if (closeModalBtn) closeModalBtn.addEventListener('click', closeModal);
+    if (cancelModalBtn) cancelModalBtn.addEventListener('click', closeModal);
 
-    if (closeModalBtn) {
-      closeModalBtn.addEventListener('click', closeModal);
-    }
-
-    if (cancelModalBtn) {
-      cancelModalBtn.addEventListener('click', closeModal);
-    }
-
-    // Close on backdrop click
     if (activityModal) {
       activityModal.addEventListener('click', (e) => {
-        if (e.target === activityModal) {
-          closeModal();
-        }
+        if (e.target === activityModal) closeModal();
       });
     }
 
-    // Close on ESC key
+    if (activityForm) {
+      activityForm.addEventListener('submit', handleActivityFormSubmit);
+    }
+
+    // Expense Modal Listeners (Phase 4)
+    if (openAddExpenseBtn) openAddExpenseBtn.addEventListener('click', openAddExpenseModal);
+    if (closeExpenseModalBtn) closeExpenseModalBtn.addEventListener('click', closeExpenseModal);
+    if (cancelExpenseModalBtn) cancelExpenseModalBtn.addEventListener('click', closeExpenseModal);
+
+    if (expenseModal) {
+      expenseModal.addEventListener('click', (e) => {
+        if (e.target === expenseModal) closeExpenseModal();
+      });
+    }
+
+    if (expenseForm) {
+      expenseForm.addEventListener('submit', handleExpenseFormSubmit);
+    }
+
+    // Global Key Listener
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && activityModal && activityModal.classList.contains('is-open')) {
-        closeModal();
+      if (e.key === 'Escape') {
+        if (activityModal && activityModal.classList.contains('is-open')) closeModal();
+        if (expenseModal && expenseModal.classList.contains('is-open')) closeExpenseModal();
       }
     });
-
-    // Form Submit
-    if (activityForm) {
-      activityForm.addEventListener('submit', handleFormSubmit);
-    }
   }
 
-  /**
-   * Open Modal in Add Mode
-   */
+  // ==========================================================================
+  // 5. ACTIVITY MODAL LOGIC
+  // ==========================================================================
   function openAddModal() {
     if (!activityModal || !activityForm) return;
-
     clearModalAlerts();
     activityForm.reset();
     editingActivityIdInput.value = '';
     modalTitle.textContent = 'Add Activity to Itinerary';
-    if (saveActivitySubmitBtn) {
-      saveActivitySubmitBtn.innerHTML = '<span>💾</span> Save Activity';
-    }
+    if (saveActivitySubmitBtn) saveActivitySubmitBtn.innerHTML = '<span>💾</span> Save Activity';
 
-    // Default date to trip start date or today
     if (currentTrip && currentTrip.startDate && activityDateInput) {
       activityDateInput.value = currentTrip.startDate;
     } else if (activityDateInput) {
       activityDateInput.value = new Date().toISOString().split('T')[0];
     }
 
-    // Default location to trip destination if available
     if (currentTrip && currentTrip.destination && activityLocationInput && !activityLocationInput.value) {
       activityLocationInput.value = currentTrip.destination;
     }
@@ -332,21 +555,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (activityNameInput) activityNameInput.focus();
   }
 
-  /**
-   * Open Modal in Edit Mode
-   */
   function openEditModal(activityId) {
     if (!activityModal || !activityForm || !currentTrip) return;
-
     const activity = (currentTrip.itinerary || []).find(i => String(i.id) === String(activityId));
     if (!activity) return;
 
     clearModalAlerts();
     editingActivityIdInput.value = activity.id;
     modalTitle.textContent = 'Edit Itinerary Activity';
-    if (saveActivitySubmitBtn) {
-      saveActivitySubmitBtn.innerHTML = '<span>💾</span> Update Activity';
-    }
+    if (saveActivitySubmitBtn) saveActivitySubmitBtn.innerHTML = '<span>💾</span> Update Activity';
 
     activityDateInput.value = activity.date || '';
     activityTimeInput.value = activity.time || '';
@@ -359,9 +576,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (activityNameInput) activityNameInput.focus();
   }
 
-  /**
-   * Close Modal
-   */
   function closeModal() {
     if (!activityModal) return;
     activityModal.classList.remove('is-open');
@@ -369,10 +583,7 @@ document.addEventListener('DOMContentLoaded', () => {
     clearModalAlerts();
   }
 
-  /**
-   * Handle Form Submit (Add or Edit)
-   */
-  function handleFormSubmit(e) {
+  function handleActivityFormSubmit(e) {
     e.preventDefault();
     clearModalAlerts();
 
@@ -383,46 +594,34 @@ document.addEventListener('DOMContentLoaded', () => {
     const notes = activityNotesInput ? activityNotesInput.value.trim() : '';
     const editingId = editingActivityIdInput ? editingActivityIdInput.value.trim() : '';
 
-    // Validation
     if (!name) {
       showModalAlert('Activity name is required.', 'danger');
       if (activityNameInput) activityNameInput.focus();
       return;
     }
-
     if (!location) {
       showModalAlert('Activity location is required.', 'danger');
       if (activityLocationInput) activityLocationInput.focus();
       return;
     }
-
     if (!date) {
       showModalAlert('Activity date is required.', 'danger');
       if (activityDateInput) activityDateInput.focus();
       return;
     }
 
-    // Validate date belongs to trip range where possible
     if (currentTrip && currentTrip.startDate && currentTrip.endDate) {
       if (date < currentTrip.startDate || date > currentTrip.endDate) {
         showModalAlert(`Note: Selected date (${formatDate(date)}) is outside your scheduled trip range (${formatDate(currentTrip.startDate)} – ${formatDate(currentTrip.endDate)}).`, 'warning');
       }
     }
 
-    const activityData = {
-      date: date,
-      time: time,
-      activity: name,
-      location: location,
-      notes: notes
-    };
+    const activityData = { date, time, activity: name, location, notes };
 
     if (editingId) {
-      // Update existing item
       Storage.updateItineraryItem(currentTrip.id, editingId, activityData);
       showPageAlert(`Activity "${name}" updated successfully!`, 'success');
     } else {
-      // Add new item
       Storage.addItineraryItem(currentTrip.id, activityData);
       showPageAlert(`Activity "${name}" added to itinerary!`, 'success');
     }
@@ -431,12 +630,8 @@ document.addEventListener('DOMContentLoaded', () => {
     renderItinerary();
   }
 
-  /**
-   * Delete Activity with Confirmation
-   */
   function handleDeleteActivity(activityId) {
     if (!currentTrip) return;
-
     const activity = (currentTrip.itinerary || []).find(i => String(i.id) === String(activityId));
     const activityName = activity ? `"${activity.activity}"` : 'this activity';
 
@@ -448,7 +643,119 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================================================
-  // HELPER FUNCTIONS
+  // 6. EXPENSE MODAL LOGIC (PHASE 4)
+  // ==========================================================================
+  function openAddExpenseModal() {
+    if (!expenseModal || !expenseForm) return;
+    clearExpenseModalAlerts();
+    expenseForm.reset();
+    editingExpenseIdInput.value = '';
+    expenseModalTitle.textContent = 'Add Trip Expense';
+    if (saveExpenseSubmitBtn) saveExpenseSubmitBtn.innerHTML = '<span>💾</span> Save Expense';
+
+    if (currentTrip && currentTrip.startDate && expenseDateInput) {
+      expenseDateInput.value = currentTrip.startDate;
+    } else if (expenseDateInput) {
+      expenseDateInput.value = new Date().toISOString().split('T')[0];
+    }
+
+    expenseModal.classList.add('is-open');
+    expenseModal.setAttribute('aria-hidden', 'false');
+    if (expenseTitleInput) expenseTitleInput.focus();
+  }
+
+  function openEditExpenseModal(expenseId) {
+    if (!expenseModal || !expenseForm || !currentTrip) return;
+    const expense = (currentTrip.expenses || []).find(e => String(e.id) === String(expenseId));
+    if (!expense) return;
+
+    clearExpenseModalAlerts();
+    editingExpenseIdInput.value = expense.id;
+    expenseModalTitle.textContent = 'Edit Expense Entry';
+    if (saveExpenseSubmitBtn) saveExpenseSubmitBtn.innerHTML = '<span>💾</span> Update Expense';
+
+    expenseTitleInput.value = expense.title || '';
+    expenseCategoryInput.value = expense.category || '';
+    expenseAmountInput.value = expense.amount || '';
+    expenseDateInput.value = expense.date || '';
+    expenseNotesInput.value = expense.notes || '';
+
+    expenseModal.classList.add('is-open');
+    expenseModal.setAttribute('aria-hidden', 'false');
+    if (expenseTitleInput) expenseTitleInput.focus();
+  }
+
+  function closeExpenseModal() {
+    if (!expenseModal) return;
+    expenseModal.classList.remove('is-open');
+    expenseModal.setAttribute('aria-hidden', 'true');
+    clearExpenseModalAlerts();
+  }
+
+  function handleExpenseFormSubmit(e) {
+    e.preventDefault();
+    clearExpenseModalAlerts();
+
+    const title = expenseTitleInput ? expenseTitleInput.value.trim() : '';
+    const category = expenseCategoryInput ? expenseCategoryInput.value.trim() : '';
+    const amountVal = expenseAmountInput ? parseFloat(expenseAmountInput.value) : 0;
+    const date = expenseDateInput ? expenseDateInput.value.trim() : '';
+    const notes = expenseNotesInput ? expenseNotesInput.value.trim() : '';
+    const editingId = editingExpenseIdInput ? editingExpenseIdInput.value.trim() : '';
+
+    // Validation
+    if (!title) {
+      showExpenseModalAlert('Expense title is required.', 'danger');
+      if (expenseTitleInput) expenseTitleInput.focus();
+      return;
+    }
+
+    if (!category) {
+      showExpenseModalAlert('Please select an expense category.', 'danger');
+      if (expenseCategoryInput) expenseCategoryInput.focus();
+      return;
+    }
+
+    if (isNaN(amountVal) || amountVal <= 0) {
+      showExpenseModalAlert('Amount must be a positive number greater than 0.', 'danger');
+      if (expenseAmountInput) expenseAmountInput.focus();
+      return;
+    }
+
+    if (!date) {
+      showExpenseModalAlert('Expense date is required.', 'danger');
+      if (expenseDateInput) expenseDateInput.focus();
+      return;
+    }
+
+    const expenseData = { title, category, amount: amountVal, date, notes };
+
+    if (editingId) {
+      Storage.updateExpense(currentTrip.id, editingId, expenseData);
+      showPageAlert(`Expense "${title}" updated successfully!`, 'success');
+    } else {
+      Storage.addExpense(currentTrip.id, expenseData);
+      showPageAlert(`Expense "${title}" (₹${amountVal.toLocaleString()}) recorded!`, 'success');
+    }
+
+    closeExpenseModal();
+    renderBudgetAndExpenses();
+  }
+
+  function handleDeleteExpense(expenseId) {
+    if (!currentTrip) return;
+    const expense = (currentTrip.expenses || []).find(e => String(e.id) === String(expenseId));
+    const expenseTitle = expense ? `"${expense.title}"` : 'this expense';
+
+    if (window.confirm(`Are you sure you want to delete ${expenseTitle}?`)) {
+      Storage.deleteExpense(currentTrip.id, expenseId);
+      showPageAlert('Expense deleted successfully.', 'warning');
+      renderBudgetAndExpenses();
+    }
+  }
+
+  // ==========================================================================
+  // 7. HELPER FUNCTIONS
   // ==========================================================================
 
   function groupActivitiesByDate(activities) {
@@ -516,6 +823,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function clearModalAlerts() {
     if (modalAlertContainer) modalAlertContainer.innerHTML = '';
+  }
+
+  function showExpenseModalAlert(message, type = 'danger') {
+    if (!expenseModalAlertContainer) return;
+    expenseModalAlertContainer.innerHTML = `
+      <div class="alert alert-${type}">
+        <span>⚠️</span>
+        <div>${escapeHtml(message)}</div>
+      </div>
+    `;
+  }
+
+  function clearExpenseModalAlerts() {
+    if (expenseModalAlertContainer) expenseModalAlertContainer.innerHTML = '';
   }
 
   function showPageAlert(message, type = 'success') {
