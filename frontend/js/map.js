@@ -111,36 +111,123 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!mapInstance || !layerGroup || !currentTrip) return;
 
     layerGroup.clearLayers();
-    const activities = currentTrip.itinerary || [];
     const validPoints = [];
 
-    activities.forEach((item, index) => {
-      const lat = parseFloat(item.latitude || item.lat);
-      const lng = parseFloat(item.longitude || item.lng);
-
+    // 1. Collect waypoints from destinations (origin, intermediate stops, destination)
+    const destinations = currentTrip.destinations || currentTrip.addedStops || [];
+    destinations.forEach((dest, idx) => {
+      const lat = parseFloat(dest.latitude || dest.lat);
+      const lng = parseFloat(dest.longitude || dest.lng);
       if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        const isFirst = idx === 0;
+        const isLast = idx === destinations.length - 1;
+        let role = isFirst ? 'Origin' : (isLast ? 'Destination' : 'Stop');
         const point = {
           lat,
           lng,
-          id: item.id,
-          title: item.activity || 'Activity Location',
-          location: item.location || '',
-          date: item.date || '',
-          time: item.time || '',
-          notes: item.notes || '',
-          index: index + 1
+          id: `dest-${dest.id || idx}`,
+          title: dest.city || dest.name || `${role} Location`,
+          location: dest.country ? `${dest.city || dest.name}, ${dest.country}` : (dest.city || dest.name || ''),
+          date: dest.visit_date || '',
+          time: '',
+          notes: dest.notes || '',
+          index: validPoints.length + 1,
+          role: role
         };
         validPoints.push(point);
 
         const marker = L.marker([lat, lng]).addTo(layerGroup);
         const popupContent = `
           <div class="map-popup-card">
-            <div class="map-popup-title">#${index + 1} ${escapeHtml(point.title)}</div>
-            <div class="map-popup-meta">📍 ${escapeHtml(point.location)} ${point.time ? `• ⏰ ${point.time}` : ''}</div>
+            <div class="map-popup-title">${role === 'Origin' ? '🏁' : (role === 'Destination' ? '🎯' : '📍')} ${escapeHtml(point.title)}</div>
+            <div class="map-popup-meta"><strong>${role}</strong> ${point.location ? `• ${escapeHtml(point.location)}` : ''}</div>
             ${point.notes ? `<div class="map-popup-notes">${escapeHtml(point.notes)}</div>` : ''}
           </div>
         `;
         marker.bindPopup(popupContent);
+      }
+    });
+
+    // 2. If destinations didn't include start/destination coordinates, check trip-level coordinates
+    if (validPoints.length === 0) {
+      const startLat = parseFloat(currentTrip.start_latitude || currentTrip.startLatitude);
+      const startLng = parseFloat(currentTrip.start_longitude || currentTrip.startLongitude);
+      if (!isNaN(startLat) && !isNaN(startLng) && startLat >= -90 && startLat <= 90 && startLng >= -180 && startLng <= 180) {
+        const startPoint = {
+          lat: startLat,
+          lng: startLng,
+          id: 'start-city',
+          title: currentTrip.fromCity || 'Starting Location',
+          location: currentTrip.fromCity || '',
+          index: validPoints.length + 1,
+          role: 'Origin'
+        };
+        validPoints.push(startPoint);
+        const startMarker = L.marker([startLat, startLng]).addTo(layerGroup);
+        startMarker.bindPopup(`
+          <div class="map-popup-card">
+            <div class="map-popup-title">🏁 ${escapeHtml(startPoint.title)}</div>
+            <div class="map-popup-meta"><strong>Origin City</strong></div>
+          </div>
+        `);
+      }
+
+      const destLat = parseFloat(currentTrip.destination_latitude || currentTrip.destinationLatitude);
+      const destLng = parseFloat(currentTrip.destination_longitude || currentTrip.destinationLongitude);
+      if (!isNaN(destLat) && !isNaN(destLng) && destLat >= -90 && destLat <= 90 && destLng >= -180 && destLng <= 180) {
+        const destPoint = {
+          lat: destLat,
+          lng: destLng,
+          id: 'dest-city',
+          title: currentTrip.toCity || currentTrip.destination || 'Destination Location',
+          location: currentTrip.toCity || currentTrip.destination || '',
+          index: validPoints.length + 1,
+          role: 'Destination'
+        };
+        validPoints.push(destPoint);
+        const destMarker = L.marker([destLat, destLng]).addTo(layerGroup);
+        destMarker.bindPopup(`
+          <div class="map-popup-card">
+            <div class="map-popup-title">🎯 ${escapeHtml(destPoint.title)}</div>
+            <div class="map-popup-meta"><strong>Destination City</strong></div>
+          </div>
+        `);
+      }
+    }
+
+    // 3. Collect waypoints from scheduled itinerary activities
+    const activities = currentTrip.itinerary || [];
+    activities.forEach((item, index) => {
+      const lat = parseFloat(item.latitude || item.lat);
+      const lng = parseFloat(item.longitude || item.lng);
+
+      if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        const isDuplicate = validPoints.some(p => Math.abs(p.lat - lat) < 0.0001 && Math.abs(p.lng - lng) < 0.0001 && p.title === item.activity);
+        if (!isDuplicate) {
+          const point = {
+            lat,
+            lng,
+            id: item.id,
+            title: item.activity || 'Activity Location',
+            location: item.location || '',
+            date: item.date || '',
+            time: item.time || '',
+            notes: item.notes || '',
+            index: validPoints.length + 1,
+            role: 'Activity'
+          };
+          validPoints.push(point);
+
+          const marker = L.marker([lat, lng]).addTo(layerGroup);
+          const popupContent = `
+            <div class="map-popup-card">
+              <div class="map-popup-title">#${point.index} ${escapeHtml(point.title)}</div>
+              <div class="map-popup-meta">📍 ${escapeHtml(point.location)} ${point.time ? `• ⏰ ${point.time}` : ''}</div>
+              ${point.notes ? `<div class="map-popup-notes">${escapeHtml(point.notes)}</div>` : ''}
+            </div>
+          `;
+          marker.bindPopup(popupContent);
+        }
       }
     });
 
@@ -174,7 +261,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <div style="display: flex; align-items: center; gap: 0.5rem;">
                 <span class="day-badge" style="padding: 0.15rem 0.5rem; font-size: 0.75rem;">#${p.index}</span>
                 <strong>${escapeHtml(p.title)}</strong>
-                <span style="color: var(--text-muted); font-size: 0.85rem;">(${escapeHtml(p.location)})</span>
+                <span style="color: var(--text-muted); font-size: 0.85rem;">(${escapeHtml(p.location || p.role || '')})</span>
               </div>
               <span style="color: var(--primary); font-size: 0.8rem; font-weight: 600;">[ ${p.lat.toFixed(4)}, ${p.lng.toFixed(4)} ]</span>
             </div>
@@ -191,7 +278,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
       }
     } else {
-      if (standaloneMapEmptyState) standaloneMapEmptyState.style.display = 'block';
+      if (standaloneMapEmptyState) {
+        standaloneMapEmptyState.style.display = 'block';
+        standaloneMapEmptyState.innerHTML = `
+          <span class="state-icon">📍</span>
+          <div class="state-title">Location data is not available for this trip.</div>
+          <div class="state-desc">Automatic geocoding could not determine coordinates for the entered locations, or no location coordinates were provided.</div>
+        `;
+      }
       if (standaloneMapBadge) standaloneMapBadge.textContent = '0 locations plotted';
       if (mapWaypointsListContainer) mapWaypointsListContainer.style.display = 'none';
     }

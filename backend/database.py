@@ -41,6 +41,22 @@ def init_db():
         )
     """)
 
+    # Safe migration for trips table coordinate columns
+    trip_columns = conn.execute("PRAGMA table_info(trips)").fetchall()
+    trip_column_names = [column["name"] for column in trip_columns]
+
+    if "start_latitude" not in trip_column_names:
+        conn.execute("ALTER TABLE trips ADD COLUMN start_latitude REAL")
+
+    if "start_longitude" not in trip_column_names:
+        conn.execute("ALTER TABLE trips ADD COLUMN start_longitude REAL")
+
+    if "destination_latitude" not in trip_column_names:
+        conn.execute("ALTER TABLE trips ADD COLUMN destination_latitude REAL")
+
+    if "destination_longitude" not in trip_column_names:
+        conn.execute("ALTER TABLE trips ADD COLUMN destination_longitude REAL")
+
     # Destinations table
     conn.execute("""
         CREATE TABLE IF NOT EXISTS destinations (

@@ -10,13 +10,68 @@ const API_BASE_URL = '/api';
 
 const API = {
   /**
+   * Session / Authentication Helpers
+   */
+  getCurrentUser() {
+    try {
+      const userStr = sessionStorage.getItem('gt_auth_user') || localStorage.getItem('gt_auth_user');
+      return userStr ? JSON.parse(userStr) : null;
+    } catch (e) {
+      return null;
+    }
+  },
+
+  setCurrentUser(user) {
+    if (user) {
+      sessionStorage.setItem('gt_auth_user', JSON.stringify(user));
+      localStorage.setItem('gt_auth_user', JSON.stringify(user));
+    } else {
+      this.clearCurrentUser();
+    }
+  },
+
+  clearCurrentUser() {
+    sessionStorage.removeItem('gt_auth_user');
+    localStorage.removeItem('gt_auth_user');
+  },
+
+  logout() {
+    this.clearCurrentUser();
+    window.location.href = 'login.html';
+  },
+
+  async login(credentials) {
+    const data = await this.request('/login', {
+      method: 'POST',
+      body: JSON.stringify(credentials)
+    });
+    if (data && data.user) {
+      this.setCurrentUser(data.user);
+    }
+    return data;
+  },
+
+  async register(userData) {
+    const data = await this.request('/register', {
+      method: 'POST',
+      body: JSON.stringify(userData)
+    });
+    if (data && data.user) {
+      this.setCurrentUser(data.user);
+    }
+    return data;
+  },
+
+  /**
    * Helper for standard JSON HTTP requests
    */
   async request(endpoint, options = {}) {
     const url = `${API_BASE_URL}${endpoint}`;
+    const user = this.getCurrentUser();
     const headers = {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
+      ...(user && user.id ? { 'X-User-Id': String(user.id) } : {}),
       ...(options.headers || {})
     };
 
@@ -32,9 +87,10 @@ const API = {
         try {
           errorData = await response.json();
         } catch (_) {
-          errorData = { message: `Request failed with status ${response.status}` };
+          errorData = { error: `Request failed with status ${response.status}` };
         }
-        throw new Error(errorData.message || `HTTP ${response.status}`);
+        const errorMsg = (errorData && (errorData.error || errorData.message)) || `HTTP ${response.status}`;
+        throw new Error(errorMsg);
       }
 
       if (response.status === 204) {
@@ -54,10 +110,13 @@ const API = {
 
   /**
    * GET /api/trips
-   * Retrieves list of all trips
+   * Retrieves list of trips for current authenticated user
    */
   async getTrips() {
-    return await this.request('/trips', { method: 'GET' });
+    const user = this.getCurrentUser();
+    const query = user && user.id ? `?user_id=${encodeURIComponent(user.id)}` : '';
+    const res = await this.request(`/trips${query}`, { method: 'GET' });
+    return Array.isArray(res) ? res : (res && res.trips ? res.trips : []);
   },
 
   /**
@@ -65,7 +124,9 @@ const API = {
    * Retrieves details of a specific trip
    */
   async getTripById(id) {
-    return await this.request(`/trips/${encodeURIComponent(id)}`, { method: 'GET' });
+    const user = this.getCurrentUser();
+    const query = user && user.id ? `?user_id=${encodeURIComponent(user.id)}` : '';
+    return await this.request(`/trips/${encodeURIComponent(id)}${query}`, { method: 'GET' });
   },
 
   /**
@@ -73,9 +134,14 @@ const API = {
    * Creates a new trip
    */
   async createTrip(tripData) {
+    const user = this.getCurrentUser();
+    const payload = {
+      ...(tripData || {}),
+      user_id: (tripData && tripData.user_id) || (user && user.id)
+    };
     return await this.request('/trips', {
       method: 'POST',
-      body: JSON.stringify(tripData)
+      body: JSON.stringify(payload)
     });
   },
 
@@ -84,9 +150,14 @@ const API = {
    * Updates an existing trip
    */
   async updateTrip(id, tripData) {
+    const user = this.getCurrentUser();
+    const payload = {
+      ...(tripData || {}),
+      user_id: (tripData && tripData.user_id) || (user && user.id)
+    };
     return await this.request(`/trips/${encodeURIComponent(id)}`, {
       method: 'PUT',
-      body: JSON.stringify(tripData)
+      body: JSON.stringify(payload)
     });
   },
 
@@ -95,8 +166,10 @@ const API = {
    * Deletes a trip
    */
   async deleteTrip(id) {
+    const user = this.getCurrentUser();
     return await this.request(`/trips/${encodeURIComponent(id)}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      body: JSON.stringify({ user_id: user && user.id })
     });
   },
 
@@ -117,6 +190,65 @@ const API = {
   },
 
   // ==========================================================================
+  // DESTINATIONS ENDPOINTS
+  // ==========================================================================
+
+  /**
+   * GET /api/trips/:id/destinations
+   */
+  async getDestinations(tripId) {
+    const res = await this.request(`/trips/${encodeURIComponent(tripId)}/destinations`, { method: 'GET' });
+    return (res && res.destinations) ? res.destinations : res;
+  },
+
+  /**
+   * POST /api/trips/:id/destinations
+   */
+  async addDestination(tripId, destinationData) {
+    const user = this.getCurrentUser();
+    const payload = {
+      ...(destinationData || {}),
+      user_id: (destinationData && destinationData.user_id) || (user && user.id)
+    };
+    return await this.request(`/trips/${encodeURIComponent(tripId)}/destinations`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  },
+
+  /**
+   * PUT /api/destinations/:id
+   */
+  async updateDestination(destinationId, destinationData, tripId) {
+    const user = this.getCurrentUser();
+    const payload = {
+      ...(destinationData || {}),
+      user_id: (destinationData && destinationData.user_id) || (user && user.id)
+    };
+    const path = tripId
+      ? `/trips/${encodeURIComponent(tripId)}/destinations/${encodeURIComponent(destinationId)}`
+      : `/destinations/${encodeURIComponent(destinationId)}`;
+    return await this.request(path, {
+      method: 'PUT',
+      body: JSON.stringify(payload)
+    });
+  },
+
+  /**
+   * DELETE /api/destinations/:id
+   */
+  async deleteDestination(destinationId, tripId) {
+    const user = this.getCurrentUser();
+    const path = tripId
+      ? `/trips/${encodeURIComponent(tripId)}/destinations/${encodeURIComponent(destinationId)}`
+      : `/destinations/${encodeURIComponent(destinationId)}`;
+    return await this.request(path, {
+      method: 'DELETE',
+      body: JSON.stringify({ user_id: user && user.id })
+    });
+  },
+
+  // ==========================================================================
   // ITINERARY ENDPOINTS
   // ==========================================================================
 
@@ -125,7 +257,8 @@ const API = {
    * Gets itinerary activities for a trip
    */
   async getItinerary(tripId) {
-    return await this.request(`/trips/${encodeURIComponent(tripId)}/itinerary`, { method: 'GET' });
+    const res = await this.request(`/trips/${encodeURIComponent(tripId)}/itinerary`, { method: 'GET' });
+    return (res && res.itinerary) ? res.itinerary : res;
   },
 
   /**
@@ -133,9 +266,14 @@ const API = {
    * Adds an activity item to the trip itinerary
    */
   async addItineraryItem(tripId, itemData) {
+    const user = this.getCurrentUser();
+    const payload = {
+      ...(itemData || {}),
+      user_id: (itemData && itemData.user_id) || (user && user.id)
+    };
     return await this.request(`/trips/${encodeURIComponent(tripId)}/itinerary`, {
       method: 'POST',
-      body: JSON.stringify(itemData)
+      body: JSON.stringify(payload)
     });
   },
 
@@ -144,9 +282,14 @@ const API = {
    * Updates an activity item
    */
   async updateItineraryItem(tripId, activityId, itemData) {
+    const user = this.getCurrentUser();
+    const payload = {
+      ...(itemData || {}),
+      user_id: (itemData && itemData.user_id) || (user && user.id)
+    };
     return await this.request(`/trips/${encodeURIComponent(tripId)}/itinerary/${encodeURIComponent(activityId)}`, {
       method: 'PUT',
-      body: JSON.stringify(itemData)
+      body: JSON.stringify(payload)
     });
   },
 
@@ -155,8 +298,10 @@ const API = {
    * Deletes an activity item
    */
   async deleteItineraryItem(tripId, activityId) {
+    const user = this.getCurrentUser();
     return await this.request(`/trips/${encodeURIComponent(tripId)}/itinerary/${encodeURIComponent(activityId)}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      body: JSON.stringify({ user_id: user && user.id })
     });
   },
 
@@ -177,9 +322,14 @@ const API = {
    * Adds an expense record
    */
   async addExpense(tripId, expenseData) {
+    const user = this.getCurrentUser();
+    const payload = {
+      ...(expenseData || {}),
+      user_id: (expenseData && expenseData.user_id) || (user && user.id)
+    };
     return await this.request(`/trips/${encodeURIComponent(tripId)}/expenses`, {
       method: 'POST',
-      body: JSON.stringify(expenseData)
+      body: JSON.stringify(payload)
     });
   },
 
@@ -188,9 +338,14 @@ const API = {
    * Updates an expense record
    */
   async updateExpense(tripId, expenseId, expenseData) {
+    const user = this.getCurrentUser();
+    const payload = {
+      ...(expenseData || {}),
+      user_id: (expenseData && expenseData.user_id) || (user && user.id)
+    };
     return await this.request(`/trips/${encodeURIComponent(tripId)}/expenses/${encodeURIComponent(expenseId)}`, {
       method: 'PUT',
-      body: JSON.stringify(expenseData)
+      body: JSON.stringify(payload)
     });
   },
 
@@ -199,9 +354,33 @@ const API = {
    * Deletes an expense record
    */
   async deleteExpense(tripId, expenseId) {
+    const user = this.getCurrentUser();
     return await this.request(`/trips/${encodeURIComponent(tripId)}/expenses/${encodeURIComponent(expenseId)}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      body: JSON.stringify({ user_id: user && user.id })
     });
+  },
+
+  /**
+   * PUT /api/trips/:id/budget
+   * Updates trip total budget
+   */
+  async updateBudget(tripId, budget) {
+    const user = this.getCurrentUser();
+    return await this.request(`/trips/${encodeURIComponent(tripId)}/budget`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        budget,
+        user_id: user && user.id
+      })
+    });
+  },
+
+  /**
+   * GET /api/trips/:id/budget-summary
+   */
+  async getBudgetSummary(tripId) {
+    return await this.request(`/trips/${encodeURIComponent(tripId)}/budget-summary`, { method: 'GET' });
   },
 
   // ==========================================================================
@@ -213,7 +392,8 @@ const API = {
    * Retrieves collaborators list for a trip
    */
   async getCollaborators(tripId) {
-    return await this.request(`/trips/${encodeURIComponent(tripId)}/collaborators`, { method: 'GET' });
+    const res = await this.request(`/trips/${encodeURIComponent(tripId)}/collaborators`, { method: 'GET' });
+    return (res && res.collaborators) ? res.collaborators : res;
   },
 
   /**
@@ -221,9 +401,14 @@ const API = {
    * Invites a new collaborator to the trip
    */
   async inviteCollaborator(tripId, inviteData) {
+    const user = this.getCurrentUser();
+    const payload = {
+      ...(inviteData || {}),
+      user_id: (inviteData && inviteData.user_id) || (user && user.id)
+    };
     return await this.request(`/trips/${encodeURIComponent(tripId)}/collaborators/invite`, {
       method: 'POST',
-      body: JSON.stringify(inviteData)
+      body: JSON.stringify(payload)
     });
   },
 
@@ -232,16 +417,28 @@ const API = {
    * Removes a collaborator from the trip
    */
   async removeCollaborator(tripId, collabId) {
+    const user = this.getCurrentUser();
     return await this.request(`/trips/${encodeURIComponent(tripId)}/collaborators/${encodeURIComponent(collabId)}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      body: JSON.stringify({ user_id: user && user.id })
     });
   },
 
   /**
-   * GET /api/shared/trips/:id
+   * POST /api/trips/:id/share
+   * Creates or gets a share link token
+   */
+  async createShareLink(tripId) {
+    return await this.request(`/trips/${encodeURIComponent(tripId)}/share`, {
+      method: 'POST'
+    });
+  },
+
+  /**
+   * GET /api/shared-trips/:tokenOrId
    * Retrieves shared trip details for external viewers
    */
-  async getSharedTrip(id) {
-    return await this.request(`/shared/trips/${encodeURIComponent(id)}`, { method: 'GET' });
+  async getSharedTrip(tokenOrId) {
+    return await this.request(`/shared-trips/${encodeURIComponent(tokenOrId)}`, { method: 'GET' });
   }
 };
