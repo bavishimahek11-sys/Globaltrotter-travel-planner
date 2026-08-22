@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Create Trip - GlobalTrotter Travel Planner</title>
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+
+  <!-- Site Header & Navigation -->
+  <header class="site-header">
+    <div class="container navbar">
+      <a href="index.html" class="brand-logo">
+        <span class="brand-icon">✈️</span>
+        <span>Global<strong>Trotter</strong></span>
+      </a>
+
+      <button class="nav-toggle" aria-label="Toggle navigation">☰</button>
+
+      <ul class="nav-links">
+        <li><a href="index.html" class="nav-link">Home</a></li>
+        <li><a href="create-trip.html" class="nav-link active">Plan Trip</a></li>
+        <li><a href="itinerary.html" class="nav-link">Itinerary</a></li>
+        <li><a href="trips.html" class="nav-link">My Trips</a></li>
+        <li><a href="budget.html" class="nav-link">Budget</a></li>
+        <li><a href="map.html" class="nav-link">Map</a></li>
+      </ul>
+    </div>
+  </header>
+
+  <!-- Page Hero Header -->
+  <section class="page-hero">
+    <div class="container">
+      <h1>Plan Your Next Adventure</h1>
+      <p>Select your starting city and destination to explore curated intermediate stops and build your seamless itinerary.</p>
+    </div>
+  </section>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <div class="container">
+      <div class="planner-grid">
+        
+        <!-- Left Column: Route Planner & Smart Stop Suggestions -->
+        <div class="planner-main">
+          
+          <!-- Route Selection Card -->
+          <div class="card route-selector-card">
+            <h2 class="section-title">
+              <span>📍</span> Select Your Route
+            </h2>
+            <p class="section-subtitle">Choose where your journey begins and ends.</p>
+
+            <form id="routeForm" class="route-form" onsubmit="return false;">
+              
+              <!-- From City -->
+              <div class="form-group">
+                <label for="fromCity" class="form-label">
+                  <span>🛫</span> From City
+                </label>
+                <select id="fromCity" class="form-control" required>
+                  <option value="">-- Choose Origin --</option>
+                  <option value="Ahmedabad" selected>Ahmedabad</option>
+                  <option value="Mumbai">Mumbai</option>
+                  <option value="Delhi">Delhi</option>
+                  <option value="Jaipur">Jaipur</option>
+                  <option value="Bangalore">Bangalore</option>
+                  <option value="Chennai">Chennai</option>
+                  <option value="Goa">Goa</option>
+                  <option value="Pune">Pune</option>
+                </select>
+              </div>
+
+              <!-- To City -->
+              <div class="form-group">
+                <label for="toCity" class="form-label">
+                  <span>🛬</span> To City
+                </label>
+                <select id="toCity" class="form-control" required>
+                  <option value="">-- Choose Destination --</option>
+                  <option value="Ahmedabad">Ahmedabad</option>
+                  <option value="Mumbai" selected>Mumbai</option>
+                  <option value="Delhi">Delhi</option>
+                  <option value="Jaipur">Jaipur</option>
+                  <option value="Bangalore">Bangalore</option>
+                  <option value="Chennai">Chennai</option>
+                  <option value="Goa">Goa</option>
+                  <option value="Pune">Pune</option>
+                </select>
+              </div>
+
+              <!-- Action Button -->
+              <div class="form-group">
+                <button type="button" id="findStopsBtn" class="btn btn-primary">
+                  <span>🔍</span> Find Smart Stops
+                </button>
+              </div>
+
+            </form>
+
+            <!-- Quick Route Presets -->
+            <div class="quick-routes">
+              <span class="quick-routes-label">Popular routes:</span>
+              <div class="quick-routes-list">
+                <button type="button" class="route-chip" data-from="Ahmedabad" data-to="Mumbai">Ahmedabad ➔ Mumbai</button>
+                <button type="button" class="route-chip" data-from="Delhi" data-to="Jaipur">Delhi ➔ Jaipur</button>
+                <button type="button" class="route-chip" data-from="Mumbai" data-to="Goa">Mumbai ➔ Goa</button>
+                <button type="button" class="route-chip" data-from="Bangalore" data-to="Chennai">Bangalore ➔ Chennai</button>
+              </div>
+            </div>
+
+            <!-- Alerts Container -->
+            <div id="alertContainer" style="margin-top: 1rem;"></div>
+
+          </div>
+
+          <!-- Smart Stop Suggestions Section -->
+          <section id="smartStopsSection" class="smart-stops-section">
+            
+            <div class="smart-stops-header">
+              <div>
+                <h2>
+                  <span class="sparkle-icon">✨</span> Smart Stops For You
+                </h2>
+                <p class="section-subtitle" style="margin-bottom: 0;">Discover interesting intermediate places along your travel route.</p>
+              </div>
+              <span id="activeRouteBadge" class="route-indicator-badge">Ahmedabad ➔ Mumbai</span>
+            </div>
+
+            <!-- Dynamic Suggestions Container (Cards / Loading / Empty) -->
+            <div id="suggestionsContainer">
+              <!-- Rendered via create-trip.js -->
+            </div>
+
+          </section>
+
+        </div>
+
+        <!-- Right Column: Live Itinerary Timeline & Added Stops -->
+        <aside class="planner-sidebar">
+          <div class="card itinerary-summary-card">
+            <h2 class="section-title">
+              <span>🗺️</span> Your Route
+            </h2>
+            <p class="section-subtitle">Live itinerary with added stops</p>
+
+            <div id="timelineEmpty" class="timeline-empty">
+              Select a route to begin building your trip timeline.
+            </div>
+
+            <ul class="timeline-list">
+              <!-- Origin -->
+              <li id="timelineOrigin" class="timeline-item" style="display: none;">
+                <div class="timeline-dot origin"></div>
+                <div class="timeline-content">
+                  <div>
+                    <div class="timeline-name">Origin</div>
+                    <div class="timeline-type">Departure City</div>
+                  </div>
+                </div>
+              </li>
+
+              <!-- Intermediate Stops Container -->
+              <div id="timelineStopsList"></div>
+
+              <!-- Destination -->
+              <li id="timelineDestination" class="timeline-item" style="display: none;">
+                <div class="timeline-dot destination"></div>
+                <div class="timeline-content">
+                  <div>
+                    <div class="timeline-name">Destination</div>
+                    <div class="timeline-type">Final Destination</div>
+                  </div>
+                </div>
+              </li>
+            </ul>
+
+            <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+              <a href="itinerary.html" class="btn btn-outline" style="width: 100%;">
+                <span>📋</span> View Full Itinerary
+              </a>
+            </div>
+
+          </div>
+        </aside>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- Site Footer -->
+  <footer class="site-footer">
+    <div class="container">
+      <p>&copy; 2026 GlobalTrotter Travel Planner • Hackathon Prototype</p>
+    </div>
+  </footer>
+
+  <!-- Vanilla JavaScript Files -->
+  <script src="js/storage.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/create-trip.js"></script>
+</body>
+</html>

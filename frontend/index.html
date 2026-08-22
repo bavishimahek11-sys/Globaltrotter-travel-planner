@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GlobalTrotter - Smart Travel Planner</title>
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="site-header">
+    <div class="container navbar">
+      <a href="index.html" class="brand-logo">
+        <span class="brand-icon">✈️</span>
+        <span>Global<strong>Trotter</strong></span>
+      </a>
+
+      <button class="nav-toggle" aria-label="Toggle navigation">☰</button>
+
+      <ul class="nav-links">
+        <li><a href="index.html" class="nav-link active">Home</a></li>
+        <li><a href="create-trip.html" class="nav-link">Plan Trip</a></li>
+        <li><a href="itinerary.html" class="nav-link">Itinerary</a></li>
+        <li><a href="trips.html" class="nav-link">My Trips</a></li>
+        <li><a href="budget.html" class="nav-link">Budget</a></li>
+        <li><a href="map.html" class="nav-link">Map</a></li>
+      </ul>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="page-hero" style="padding: 4.5rem 0;">
+    <div class="container">
+      <h1 style="font-size: 2.75rem; margin-bottom: 1rem;">Seamless Multi-City Travel Planning</h1>
+      <p style="font-size: 1.2rem; margin-bottom: 2rem;">
+        Discover hidden gems, get smart intermediate stop suggestions, and build the perfect travel itinerary in seconds.
+      </p>
+      <div>
+        <a href="create-trip.html" class="btn btn-primary" style="font-size: 1.1rem; padding: 0.85rem 1.75rem;">
+          <span>✨</span> Try Smart Stop Suggestions
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features Highlights -->
+  <main class="main-content">
+    <div class="container">
+      <div style="text-align: center; margin-bottom: 2.5rem;">
+        <h2 style="font-size: 1.75rem; margin-bottom: 0.5rem;">Why GlobalTrotter?</h2>
+        <p style="color: var(--text-muted);">Smart tools designed for modern explorers</p>
+      </div>
+
+      <div class="suggestions-grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
+        
+        <!-- Feature 1: Smart Stop Suggestions -->
+        <div class="card" style="text-align: center; padding: 2rem;">
+          <div style="font-size: 2.5rem; margin-bottom: 1rem;">✨</div>
+          <h3 style="font-size: 1.2rem; margin-bottom: 0.5rem;">Smart Stop Suggestions</h3>
+          <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem;">
+            Automatically discover curated intermediate destinations between any two cities on your route.
+          </p>
+          <a href="create-trip.html" class="btn btn-sm btn-outline">Explore Stops ➔</a>
+        </div>
+
+        <!-- Feature 2: Interactive Timeline -->
+        <div class="card" style="text-align: center; padding: 2rem;">
+          <div style="font-size: 2.5rem; margin-bottom: 1rem;">🗺️</div>
+          <h3 style="font-size: 1.2rem; margin-bottom: 0.5rem;">Interactive Route Timeline</h3>
+          <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem;">
+            Visualize your entire journey from departure to destination with seamless stop additions.
+          </p>
+          <a href="create-trip.html" class="btn btn-sm btn-outline">Plan Route ➔</a>
+        </div>
+
+        <!-- Feature 3: Automated Budget -->
+        <div class="card" style="text-align: center; padding: 2rem;">
+          <div style="font-size: 2.5rem; margin-bottom: 1rem;">💰</div>
+          <h3 style="font-size: 1.2rem; margin-bottom: 0.5rem;">Budget Estimation</h3>
+          <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem;">
+            Keep track of estimated travel, stay, and food expenses for all your trip stops.
+          </p>
+          <a href="budget.html" class="btn btn-sm btn-outline">View Budget ➔</a>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="container">
+      <p>&copy; 2026 GlobalTrotter Travel Planner • Hackathon Prototype</p>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="js/storage.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
