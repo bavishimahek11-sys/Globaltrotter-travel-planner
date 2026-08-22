@@ -68,11 +68,11 @@
               <div class="form-row">
                 <div class="form-group">
                   <label for="fromCity" class="form-label">
-                    <span>🛫</span> From City
+                    <span>🛫</span> From City <span style="color: var(--danger);">*</span>
                   </label>
                   <select id="fromCity" class="form-control" required>
                     <option value="">-- Choose Origin --</option>
-                    <option value="Ahmedabad" selected>Ahmedabad</option>
+                    <option value="Ahmedabad">Ahmedabad</option>
                     <option value="Mumbai">Mumbai</option>
                     <option value="Delhi">Delhi</option>
                     <option value="Jaipur">Jaipur</option>
@@ -85,12 +85,12 @@
 
                 <div class="form-group">
                   <label for="toCity" class="form-label">
-                    <span>🛬</span> To City
+                    <span>🛬</span> To City <span style="color: var(--danger);">*</span>
                   </label>
                   <select id="toCity" class="form-control" required>
                     <option value="">-- Choose Destination --</option>
                     <option value="Ahmedabad">Ahmedabad</option>
-                    <option value="Mumbai" selected>Mumbai</option>
+                    <option value="Mumbai">Mumbai</option>
                     <option value="Delhi">Delhi</option>
                     <option value="Jaipur">Jaipur</option>
                     <option value="Bangalore">Bangalore</option>
@@ -160,7 +160,7 @@
                 </h2>
                 <p class="section-subtitle" style="margin-bottom: 0;">Discover interesting intermediate places along your travel route.</p>
               </div>
-              <span id="activeRouteBadge" class="route-indicator-badge">Ahmedabad ➔ Mumbai</span>
+              <span id="activeRouteBadge" class="route-indicator-badge">Configure Route</span>
             </div>
 
             <!-- Dynamic Suggestions Container (Cards / Loading / Empty) -->
@@ -172,13 +172,13 @@
 
         </div>
 
-        <!-- Right Column: Live Itinerary Timeline & Added Stops -->
+        <!-- Right Column: Live Route Timeline & Added Stops -->
         <aside class="planner-sidebar">
           <div class="card itinerary-summary-card">
             <h2 class="section-title">
               <span>🗺️</span> Your Route
             </h2>
-            <p class="section-subtitle">Live itinerary with added stops</p>
+            <p class="section-subtitle">Selected stops and destinations</p>
 
             <div id="timelineEmpty" class="timeline-empty">
               Select a route to begin building your trip timeline.
@@ -215,9 +215,6 @@
               <button type="button" id="saveTripBtn" class="btn btn-primary" style="width: 100%;">
                 <span>💾</span> Save Trip & View Itinerary
               </button>
-              <a href="itinerary.html" class="btn btn-outline" style="width: 100%;">
-                <span>📋</span> View Current Itinerary
-              </a>
             </div>
 
           </div>
@@ -235,7 +232,7 @@
   </footer>
 
   <!-- Vanilla JavaScript Files -->
-  <script src="js/storage.js"></script>
+  <script src="js/api.js"></script>
   <script src="js/app.js"></script>
   <script src="js/create-trip.js"></script>
 </body>

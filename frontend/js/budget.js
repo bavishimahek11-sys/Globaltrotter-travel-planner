@@ -1,9 +1,8 @@
 /**
- * GlobalTrotter - Dedicated Budget & Expense Tracker JS (Phase 4)
- * Calculates real-time budget metrics, category spending breakdowns,
- * visual progress indicators, and expense CRUD.
+ * GlobalTrotter - Dedicated Budget & Expense Tracker JS (Phase 7 Clean Architecture)
+ * Fully connected to API client with clean loading, empty, and error retry states.
  *
- * Strictly no fake users, fake trips, or hardcoded sample data.
+ * NOTE: Strictly no fake expenses, fake trips, or localStorage database logic.
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -33,33 +32,87 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Trip selection
   const urlParams = new URLSearchParams(window.location.search);
-  const tripId = urlParams.get('id') || 'active';
-  let currentTrip = Storage.getTripById(tripId);
+  const tripId = urlParams.get('id');
+  let currentTrip = null;
 
-  renderBudgetPage();
   setupBudgetListeners();
+  loadBudgetData();
 
-  function renderBudgetPage() {
-    currentTrip = Storage.getTripById(tripId);
-
-    if (!currentTrip || (!currentTrip.fromCity && !currentTrip.toCity && !currentTrip.title)) {
-      if (budgetMetricsContainer) {
-        budgetMetricsContainer.innerHTML = `
-          <div class="state-box" style="padding: 2.5rem 1.5rem;">
-            <span class="state-icon">💸</span>
-            <div class="state-title">No Active Trip Selected</div>
-            <div class="state-desc">Select a trip from your dashboard or create a new trip to track your travel expenses.</div>
-            <div style="margin-top: 1.25rem;">
-              <a href="create-trip.html" class="btn btn-primary">Plan a Trip</a>
-            </div>
-          </div>
-        `;
-      }
-      if (budgetCategoryBreakdownContainer) budgetCategoryBreakdownContainer.style.display = 'none';
-      if (budgetExpensesListContainer) budgetExpensesListContainer.innerHTML = '';
-      if (budgetOpenAddExpenseBtn) budgetOpenAddExpenseBtn.style.display = 'none';
+  async function loadBudgetData() {
+    if (!tripId) {
+      renderNoTripSelected();
       return;
     }
+
+    showLoading();
+
+    try {
+      currentTrip = await API.getTripById(tripId);
+      if (!currentTrip) {
+        renderNoTripSelected();
+        return;
+      }
+      renderBudgetPage();
+    } catch (err) {
+      console.warn('Budget data loading error:', err.message);
+      renderErrorState();
+    }
+  }
+
+  function showLoading() {
+    if (budgetMetricsContainer) {
+      budgetMetricsContainer.innerHTML = `
+        <div class="state-box" style="padding: 3rem 1.5rem;">
+          <div class="spinner"></div>
+          <div class="state-title">Loading Budget Details...</div>
+          <div class="state-desc">Fetching real-time budget metrics and expenses from database.</div>
+        </div>
+      `;
+    }
+  }
+
+  function renderErrorState() {
+    if (budgetMetricsContainer) {
+      budgetMetricsContainer.innerHTML = `
+        <div class="state-box" style="padding: 3rem 1.5rem;">
+          <span class="state-icon">⚠️</span>
+          <div class="state-title">Unable to Load Budget Data</div>
+          <div class="state-desc">Could not connect to the backend server. Please verify your connection and try again.</div>
+          <div style="margin-top: 1.25rem;">
+            <button type="button" id="retryBudgetBtn" class="btn btn-primary btn-sm">
+              <span>🔄</span> Retry
+            </button>
+          </div>
+        </div>
+      `;
+
+      const retryBtn = document.getElementById('retryBudgetBtn');
+      if (retryBtn) {
+        retryBtn.addEventListener('click', loadBudgetData);
+      }
+    }
+  }
+
+  function renderNoTripSelected() {
+    if (budgetMetricsContainer) {
+      budgetMetricsContainer.innerHTML = `
+        <div class="state-box" style="padding: 2.5rem 1.5rem;">
+          <span class="state-icon">💸</span>
+          <div class="state-title">No Trip Selected</div>
+          <div class="state-desc">Select a trip from your dashboard or plan a new trip to track your travel expenses.</div>
+          <div style="margin-top: 1.25rem;">
+            <a href="create-trip.html" class="btn btn-primary btn-sm">Plan a Trip</a>
+          </div>
+        </div>
+      `;
+    }
+    if (budgetCategoryBreakdownContainer) budgetCategoryBreakdownContainer.style.display = 'none';
+    if (budgetExpensesListContainer) budgetExpensesListContainer.innerHTML = '';
+    if (budgetOpenAddExpenseBtn) budgetOpenAddExpenseBtn.style.display = 'none';
+  }
+
+  function renderBudgetPage() {
+    if (!currentTrip) return;
 
     if (budgetOpenAddExpenseBtn) budgetOpenAddExpenseBtn.style.display = 'inline-flex';
 
@@ -316,7 +369,7 @@ document.addEventListener('DOMContentLoaded', () => {
     clearBudgetModalAlerts();
   }
 
-  function handleBudgetFormSubmit(e) {
+  async function handleBudgetFormSubmit(e) {
     e.preventDefault();
     clearBudgetModalAlerts();
 
@@ -350,27 +403,45 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const expenseData = { title, category, amount: amountVal, date, notes };
 
-    if (editingId) {
-      Storage.updateExpense(currentTrip.id, editingId, expenseData);
-      showBudgetPageAlert(`Expense "${title}" updated successfully!`);
-    } else {
-      Storage.addExpense(currentTrip.id, expenseData);
-      showBudgetPageAlert(`Expense "${title}" recorded!`);
+    if (budgetSaveExpenseSubmitBtn) {
+      budgetSaveExpenseSubmitBtn.disabled = true;
+      budgetSaveExpenseSubmitBtn.innerHTML = '<span>⏳</span> Saving...';
     }
 
-    closeBudgetModal();
-    renderBudgetPage();
+    try {
+      if (editingId) {
+        await API.updateExpense(currentTrip.id, editingId, expenseData);
+        showBudgetPageAlert(`Expense "${title}" updated successfully!`);
+      } else {
+        await API.addExpense(currentTrip.id, expenseData);
+        showBudgetPageAlert(`Expense "${title}" recorded!`);
+      }
+
+      closeBudgetModal();
+      loadBudgetData();
+    } catch (err) {
+      showBudgetModalAlert(err.message || 'Failed to save expense. Please try again.');
+    } finally {
+      if (budgetSaveExpenseSubmitBtn) {
+        budgetSaveExpenseSubmitBtn.disabled = false;
+        budgetSaveExpenseSubmitBtn.innerHTML = editingId ? '<span>💾</span> Update Expense' : '<span>💾</span> Save Expense';
+      }
+    }
   }
 
-  function handleBudgetDeleteExpense(expenseId) {
+  async function handleBudgetDeleteExpense(expenseId) {
     if (!currentTrip) return;
     const expense = (currentTrip.expenses || []).find(e => String(e.id) === String(expenseId));
     const expenseTitle = expense ? `"${expense.title}"` : 'this expense';
 
     if (window.confirm(`Are you sure you want to delete ${expenseTitle}?`)) {
-      Storage.deleteExpense(currentTrip.id, expenseId);
-      showBudgetPageAlert('Expense deleted successfully.', 'warning');
-      renderBudgetPage();
+      try {
+        await API.deleteExpense(currentTrip.id, expenseId);
+        showBudgetPageAlert('Expense deleted successfully.', 'warning');
+        loadBudgetData();
+      } catch (err) {
+        showBudgetPageAlert('Failed to delete expense. Please try again.', 'danger');
+      }
     }
   }
 

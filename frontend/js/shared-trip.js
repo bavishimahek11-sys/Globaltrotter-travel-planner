@@ -1,8 +1,8 @@
 /**
- * GlobalTrotter - Dedicated Shared Trip View JS (Phase 6)
- * Renders complete read-only trip information, itinerary, budget, map, and collaborators.
+ * GlobalTrotter - Dedicated Shared Trip View JS (Phase 7 Clean Architecture)
+ * Renders complete read-only trip information, itinerary, budget, map, and collaborators using API client.
  *
- * Strictly no fake users, fake trips, fake collaborators, or hardcoded sample data.
+ * NOTE: Strictly no fake users, fake trips, fake collaborators, or localStorage database logic.
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -22,29 +22,86 @@ document.addEventListener('DOMContentLoaded', () => {
   let leafletMap = null;
   let layerGroup = null;
 
-  // Retrieve Trip
+  // Retrieve Trip ID
   const urlParams = new URLSearchParams(window.location.search);
-  const tripId = urlParams.get('id') || 'active';
-  const currentTrip = Storage.getTripById(tripId);
+  const tripId = urlParams.get('id');
+  let currentTrip = null;
 
-  renderSharedTrip();
+  loadSharedTrip();
 
-  function renderSharedTrip() {
-    if (!currentTrip || (!currentTrip.fromCity && !currentTrip.toCity && !currentTrip.title)) {
-      if (sharedTripSummaryCard) {
-        sharedTripSummaryCard.innerHTML = `
-          <div class="state-box" style="padding: 2.5rem 1.5rem;">
-            <span class="state-icon">🔍</span>
-            <div class="state-title">Shared trip not found or link has expired.</div>
-            <div class="state-desc">The trip link you opened does not contain valid trip data. Plan a new trip or return home.</div>
-            <div style="margin-top: 1.25rem;">
-              <a href="create-trip.html" class="btn btn-primary btn-sm">Create a Trip</a>
-            </div>
-          </div>
-        `;
-      }
+  async function loadSharedTrip() {
+    if (!tripId) {
+      renderNotFound();
       return;
     }
+
+    showLoading();
+
+    try {
+      currentTrip = await API.getTripById(tripId);
+      if (!currentTrip) {
+        renderNotFound();
+        return;
+      }
+      renderSharedTrip();
+    } catch (err) {
+      console.warn('Shared trip loading error:', err.message);
+      renderErrorState();
+    }
+  }
+
+  function showLoading() {
+    if (sharedTripSummaryCard) {
+      sharedTripSummaryCard.innerHTML = `
+        <div class="state-box" style="padding: 3rem 1.5rem;">
+          <div class="spinner"></div>
+          <div class="state-title">Loading Shared Trip...</div>
+          <div class="state-desc">Fetching real-time trip information from backend server.</div>
+        </div>
+      `;
+    }
+  }
+
+  function renderNotFound() {
+    if (sharedTripSummaryCard) {
+      sharedTripSummaryCard.innerHTML = `
+        <div class="state-box" style="padding: 2.5rem 1.5rem;">
+          <span class="state-icon">🔍</span>
+          <div class="state-title">Shared trip not found or link has expired.</div>
+          <div class="state-desc">The trip link you opened does not contain valid trip data. Plan a new trip or return home.</div>
+          <div style="margin-top: 1.25rem;">
+            <a href="create-trip.html" class="btn btn-primary btn-sm">Create a Trip</a>
+          </div>
+        </div>
+      `;
+    }
+    if (sharedMapEmptyState) sharedMapEmptyState.style.display = 'block';
+  }
+
+  function renderErrorState() {
+    if (sharedTripSummaryCard) {
+      sharedTripSummaryCard.innerHTML = `
+        <div class="state-box" style="padding: 3rem 1.5rem;">
+          <span class="state-icon">⚠️</span>
+          <div class="state-title">Unable to Load Shared Trip</div>
+          <div class="state-desc">Could not connect to the backend server. Please check your connection.</div>
+          <div style="margin-top: 1.25rem;">
+            <button type="button" id="retrySharedTripBtn" class="btn btn-primary btn-sm">
+              <span>🔄</span> Retry
+            </button>
+          </div>
+        </div>
+      `;
+
+      const retryBtn = document.getElementById('retrySharedTripBtn');
+      if (retryBtn) {
+        retryBtn.addEventListener('click', loadSharedTrip);
+      }
+    }
+  }
+
+  function renderSharedTrip() {
+    if (!currentTrip) return;
 
     const title = currentTrip.title || `Trip to ${currentTrip.toCity || 'Destination'}`;
     const destination = currentTrip.destination || (currentTrip.fromCity && currentTrip.toCity ? `${currentTrip.fromCity} ➔ ${currentTrip.toCity}` : 'Custom Destination');
@@ -113,17 +170,21 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!sharedTripMapEl || typeof L === 'undefined') return;
 
     try {
-      leafletMap = L.map('sharedTripMap', {
-        zoomControl: true,
-        scrollWheelZoom: false
-      }).setView([20.5937, 78.9629], 5);
+      if (!leafletMap) {
+        leafletMap = L.map('sharedTripMap', {
+          zoomControl: true,
+          scrollWheelZoom: false
+        }).setView([20.5937, 78.9629], 5);
 
-      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-      }).addTo(leafletMap);
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(leafletMap);
 
-      layerGroup = L.featureGroup().addTo(leafletMap);
+        layerGroup = L.featureGroup().addTo(leafletMap);
+      } else {
+        layerGroup.clearLayers();
+      }
 
       const activities = currentTrip.itinerary || [];
       const validPoints = [];

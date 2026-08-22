@@ -45,7 +45,7 @@
   <main class="main-content">
     <div class="container">
       
-      <!-- Read-Only Banner for Viewers (Phase 6) -->
+      <!-- Read-Only Banner for Viewers -->
       <div id="readOnlyBanner" class="read-only-banner" style="display: none;">
         <span>👀</span>
         <span><strong>Read-Only Mode:</strong> You are viewing this shared trip as a <strong>Viewer</strong>. Editing controls are disabled.</span>
@@ -59,7 +59,7 @@
         <!-- Rendered dynamically via js/itinerary.js -->
       </section>
 
-      <!-- 2. Phase 5: Interactive Route Map Section -->
+      <!-- 2. Interactive Route Map Section -->
       <section id="mapSection" class="map-section">
         <div class="itinerary-section-header">
           <div>
@@ -151,7 +151,7 @@
 
       </section>
 
-      <!-- 5. Phase 6: Trip Collaborators Section -->
+      <!-- 5. Trip Collaborators Section -->
       <section id="collaboratorsSection" class="collaborators-section">
         <div class="itinerary-section-header">
           <div>
@@ -176,9 +176,7 @@
     </div>
   </main>
 
-  <!-- =======================================================================
-       MODAL 1: ADD / EDIT ACTIVITY MODAL DIALOG
-       ======================================================================= -->
+  <!-- MODAL 1: ADD / EDIT ACTIVITY MODAL DIALOG -->
   <div id="activityModal" class="modal-backdrop" aria-hidden="true">
     <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
       
@@ -222,7 +220,6 @@
             <input type="text" id="activityLocation" class="form-control" placeholder="e.g. Vadodara, Gujarat" required>
           </div>
 
-          <!-- Optional Coordinates for Map Placements -->
           <div class="form-row">
             <div class="form-group">
               <label for="activityLat" class="form-label">
@@ -258,9 +255,7 @@
     </div>
   </div>
 
-  <!-- =======================================================================
-       MODAL 2: ADD / EDIT EXPENSE MODAL DIALOG
-       ======================================================================= -->
+  <!-- MODAL 2: ADD / EDIT EXPENSE MODAL DIALOG -->
   <div id="expenseModal" class="modal-backdrop" aria-hidden="true">
     <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="expenseModalTitle">
       
@@ -331,9 +326,7 @@
     </div>
   </div>
 
-  <!-- =======================================================================
-       MODAL 3: SHARE TRIP MODAL DIALOG (PHASE 6)
-       ======================================================================= -->
+  <!-- MODAL 3: SHARE TRIP MODAL DIALOG -->
   <div id="shareModal" class="modal-backdrop" aria-hidden="true">
     <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="shareModalTitle">
       <div class="modal-header">
@@ -363,9 +356,7 @@
     </div>
   </div>
 
-  <!-- =======================================================================
-       MODAL 4: INVITE COLLABORATOR MODAL DIALOG (PHASE 6)
-       ======================================================================= -->
+  <!-- MODAL 4: INVITE COLLABORATOR MODAL DIALOG -->
   <div id="inviteModal" class="modal-backdrop" aria-hidden="true">
     <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="inviteModalTitle">
       <div class="modal-header">
@@ -419,11 +410,11 @@
     </div>
   </footer>
 
-  <!-- Leaflet Map JS (Phase 5) -->
+  <!-- Leaflet Map JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
   <!-- Application Scripts -->
-  <script src="js/storage.js"></script>
+  <script src="js/api.js"></script>
   <script src="js/app.js"></script>
   <script src="js/itinerary.js"></script>
 </body>

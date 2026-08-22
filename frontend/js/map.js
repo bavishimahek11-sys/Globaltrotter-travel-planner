@@ -1,8 +1,8 @@
 /**
- * GlobalTrotter - Dedicated Map & Route Visualization JS (Phase 5)
- * Renders real travel routes, sequence polylines, and waypoints using Leaflet.js.
+ * GlobalTrotter - Dedicated Map & Route Visualization JS (Phase 7 Clean Architecture)
+ * Renders real travel routes, sequence polylines, and waypoints using Leaflet.js and API client.
  *
- * Strictly no fake users, fake trips, fake locations, or hardcoded coordinates.
+ * NOTE: Strictly no fake locations, fake coordinates, or localStorage database logic.
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -16,49 +16,90 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Trip selection
   const urlParams = new URLSearchParams(window.location.search);
-  const tripId = urlParams.get('id') || 'active';
-  const currentTrip = Storage.getTripById(tripId);
+  const tripId = urlParams.get('id');
+  let currentTrip = null;
 
   let mapInstance = null;
   let layerGroup = null;
 
-  initStandaloneMap();
+  loadMapData();
 
-  function initStandaloneMap() {
-    if (!standaloneMapEl || typeof L === 'undefined') return;
-
-    if (!currentTrip || (!currentTrip.fromCity && !currentTrip.toCity && !currentTrip.title)) {
-      if (standaloneMapEmptyState) {
-        standaloneMapEmptyState.style.display = 'block';
-        standaloneMapEmptyState.innerHTML = `
-          <span class="state-icon">🎒</span>
-          <div class="state-title">No Active Trip Selected</div>
-          <div class="state-desc">Select a trip from your dashboard or plan a new trip to visualize your route on the map.</div>
-          <div style="margin-top: 1.25rem;">
-            <a href="create-trip.html" class="btn btn-primary btn-sm">Plan a Trip</a>
-          </div>
-        `;
-      }
-      if (standaloneMapBadge) standaloneMapBadge.textContent = '0 locations';
+  async function loadMapData() {
+    if (!tripId) {
+      renderNoTripState();
       return;
     }
+
+    try {
+      currentTrip = await API.getTripById(tripId);
+      if (!currentTrip) {
+        renderNoTripState();
+        return;
+      }
+      initStandaloneMap();
+    } catch (err) {
+      console.warn('Map trip data loading error:', err.message);
+      renderErrorState();
+    }
+  }
+
+  function renderNoTripState() {
+    if (standaloneMapEmptyState) {
+      standaloneMapEmptyState.style.display = 'block';
+      standaloneMapEmptyState.innerHTML = `
+        <span class="state-icon">🎒</span>
+        <div class="state-title">No Trip Selected</div>
+        <div class="state-desc">Select a trip from your dashboard or plan a new trip to visualize your route on the map.</div>
+        <div style="margin-top: 1.25rem;">
+          <a href="create-trip.html" class="btn btn-primary btn-sm">Plan a Trip</a>
+        </div>
+      `;
+    }
+    if (standaloneMapBadge) standaloneMapBadge.textContent = '0 locations';
+  }
+
+  function renderErrorState() {
+    if (standaloneMapEmptyState) {
+      standaloneMapEmptyState.style.display = 'block';
+      standaloneMapEmptyState.innerHTML = `
+        <span class="state-icon">⚠️</span>
+        <div class="state-title">Unable to Load Map Data</div>
+        <div class="state-desc">Could not connect to the backend server. Please verify your connection and try again.</div>
+        <div style="margin-top: 1.25rem;">
+          <button type="button" id="retryMapBtn" class="btn btn-primary btn-sm">
+            <span>🔄</span> Retry
+          </button>
+        </div>
+      `;
+
+      const retryBtn = document.getElementById('retryMapBtn');
+      if (retryBtn) {
+        retryBtn.addEventListener('click', loadMapData);
+      }
+    }
+  }
+
+  function initStandaloneMap() {
+    if (!standaloneMapEl || typeof L === 'undefined' || !currentTrip) return;
 
     const title = currentTrip.title || `Trip to ${currentTrip.toCity || 'Destination'}`;
     if (mapHeroTitle) mapHeroTitle.textContent = `${title} — Map`;
     if (mapTripInfo) mapTripInfo.textContent = `Route: ${currentTrip.fromCity || 'Origin'} ➔ ${currentTrip.toCity || 'Destination'}`;
 
     try {
-      mapInstance = L.map('standaloneMap', {
-        zoomControl: true,
-        scrollWheelZoom: true
-      }).setView([20.5937, 78.9629], 5);
+      if (!mapInstance) {
+        mapInstance = L.map('standaloneMap', {
+          zoomControl: true,
+          scrollWheelZoom: true
+        }).setView([20.5937, 78.9629], 5);
 
-      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-      }).addTo(mapInstance);
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(mapInstance);
 
-      layerGroup = L.featureGroup().addTo(mapInstance);
+        layerGroup = L.featureGroup().addTo(mapInstance);
+      }
 
       renderWaypointsOnMap();
     } catch (e) {
