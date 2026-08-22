@@ -110,6 +110,15 @@ document.addEventListener('DOMContentLoaded', () => {
    * Save trip button handler - sends real payload to backend API
    */
   async function handleSaveTrip() {
+    const user = API.getCurrentUser();
+    if (!user || !user.id) {
+      showAlert('You must be logged in to save a trip. Redirecting to login...', 'warning');
+      setTimeout(() => {
+        window.location.href = 'login.html?redirect=create-trip.html';
+      }, 1200);
+      return;
+    }
+
     const fromCity = fromCitySelect ? fromCitySelect.value.trim() : '';
     const toCity = toCitySelect ? toCitySelect.value.trim() : '';
     const title = tripTitleInput && tripTitleInput.value.trim() ? tripTitleInput.value.trim() : `Trip from ${fromCity} to ${toCity}`;
@@ -135,14 +144,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const payload = {
       title,
+      name: title,
       destination: toCity,
       fromCity,
       toCity,
       startDate,
       endDate,
+      start_date: startDate,
+      end_date: endDate,
       budget: budgetVal,
       duration,
-      addedStops: selectedStops
+      addedStops: selectedStops,
+      user_id: user.id
     };
 
     if (saveTripBtn) {
@@ -151,15 +164,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     try {
-      const createdTrip = await API.createTrip(payload);
-      const targetId = createdTrip && createdTrip.id ? createdTrip.id : '';
+      const response = await API.createTrip(payload);
+      const targetId = (response && response.trip && response.trip.id) || (response && response.id) || '';
       if (targetId) {
         window.location.href = `itinerary.html?id=${encodeURIComponent(targetId)}`;
       } else {
         window.location.href = 'trips.html';
       }
     } catch (err) {
-      showAlert('Unable to save trip to the backend. Please verify your connection and try again.', 'danger');
+      showAlert(err.message || 'Unable to save trip to the backend. Please verify your connection and try again.', 'danger');
       if (saveTripBtn) {
         saveTripBtn.disabled = false;
         saveTripBtn.innerHTML = '<span>💾</span> Save Trip & View Itinerary';
