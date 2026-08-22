@@ -35,6 +35,40 @@ def get_trip_permission(conn, trip_id, user_id):
 
     return None
 
+def require_trip_access(conn, trip_id, user_id):
+    permission = get_trip_permission(
+        conn,
+        trip_id,
+        user_id
+    )
+
+    if permission is None:
+        return None, jsonify({
+            "error": "You do not have access to this trip"
+        }), 403
+
+    return permission, None, None
+
+
+def require_editor_access(conn, trip_id, user_id):
+    permission = get_trip_permission(
+        conn,
+        trip_id,
+        user_id
+    )
+
+    if permission is None:
+        return None, jsonify({
+            "error": "You do not have access to this trip"
+        }), 403
+
+    if permission not in ["owner", "editor"]:
+        return None, jsonify({
+            "error": "You do not have permission to modify this trip"
+        }), 403
+
+    return permission, None, None
+
 # --------------------------------------------------
 # HEALTH CHECK
 # --------------------------------------------------
@@ -620,25 +654,47 @@ def get_itinerary(trip_id):
     finally:
         conn.close()
 
-@api.route("/api/itinerary/<int:itinerary_id>", methods=["DELETE"])
+@api.route(
+    "/api/itinerary/<int:itinerary_id>",
+    methods=["DELETE"]
+)
 def delete_itinerary_item(itinerary_id):
+    data = request.get_json(silent=True) or {}
+
+    user_id = data.get("user_id")
+
+    if user_id is None:
+        return jsonify({
+            "error": "User ID is required"
+        }), 400
+
     conn = get_db_connection()
 
     try:
-        item = conn.execute(
-            "SELECT id FROM itinerary WHERE id = ?",
-            (itinerary_id,)
-        ).fetchone()
+        item = conn.execute("""
+            SELECT trip_id
+            FROM itinerary
+            WHERE id = ?
+        """, (itinerary_id,)).fetchone()
 
         if not item:
             return jsonify({
                 "error": "Itinerary item not found"
             }), 404
 
-        conn.execute(
-            "DELETE FROM itinerary WHERE id = ?",
-            (itinerary_id,)
+        permission, error_response, status = require_editor_access(
+            conn,
+            item["trip_id"],
+            int(user_id)
         )
+
+        if error_response:
+            return error_response, status
+
+        conn.execute("""
+            DELETE FROM itinerary
+            WHERE id = ?
+        """, (itinerary_id,))
 
         conn.commit()
 
@@ -650,7 +706,7 @@ def delete_itinerary_item(itinerary_id):
         conn.close()
 
 @api.route("/api/trips/<int:trip_id>/budget", methods=["PUT"])
-def update_trip_budget(trip_id):
+def update_budget(trip_id):
     data = request.get_json()
 
     if not data:
@@ -658,7 +714,13 @@ def update_trip_budget(trip_id):
             "error": "Request body is required"
         }), 400
 
+    user_id = data.get("user_id")
     budget = data.get("budget")
+
+    if user_id is None:
+        return jsonify({
+            "error": "User ID is required"
+        }), 400
 
     if budget is None:
         return jsonify({
@@ -680,10 +742,20 @@ def update_trip_budget(trip_id):
     conn = get_db_connection()
 
     try:
-        trip = conn.execute(
-            "SELECT id FROM trips WHERE id = ?",
-            (trip_id,)
-        ).fetchone()
+        permission, error_response, status = require_editor_access(
+            conn,
+            trip_id,
+            int(user_id)
+        )
+
+        if error_response:
+            return error_response, status
+
+        trip = conn.execute("""
+            SELECT id
+            FROM trips
+            WHERE id = ?
+        """, (trip_id,)).fetchone()
 
         if not trip:
             return jsonify({
@@ -694,19 +766,30 @@ def update_trip_budget(trip_id):
             UPDATE trips
             SET budget = ?
             WHERE id = ?
-        """, (budget, trip_id))
+        """, (
+            budget,
+            trip_id
+        ))
 
         conn.commit()
 
+        updated_trip = conn.execute("""
+            SELECT
+                id,
+                name,
+                budget
+            FROM trips
+            WHERE id = ?
+        """, (trip_id,)).fetchone()
+
         return jsonify({
             "message": "Budget updated successfully",
-            "trip_id": trip_id,
-            "budget": budget
+            "trip": dict(updated_trip)
         }), 200
 
     finally:
         conn.close()
-
+        
 @api.route("/api/trips/<int:trip_id>/expenses", methods=["POST"])
 def add_expense(trip_id):
     data = request.get_json()
@@ -900,6 +983,13 @@ def update_trip(trip_id):
             "error": "Request body is required"
         }), 400
 
+    user_id = data.get("user_id")
+
+    if user_id is None:
+        return jsonify({
+            "error": "User ID is required"
+        }), 400
+
     name = data.get("name")
     start_date = data.get("start_date")
     end_date = data.get("end_date")
@@ -910,73 +1000,70 @@ def update_trip(trip_id):
             "error": "Trip name is required"
         }), 400
 
-    if budget is not None:
-        try:
-            budget = float(budget)
-        except (TypeError, ValueError):
-            return jsonify({
-                "error": "Budget must be a number"
-            }), 400
-
-        if budget < 0:
-            return jsonify({
-                "error": "Budget cannot be negative"
-            }), 400
-
     conn = get_db_connection()
 
     try:
-        trip = conn.execute("""
-            SELECT id
-            FROM trips
-            WHERE id = ?
-        """, (trip_id,)).fetchone()
+        permission, error_response, status = require_trip_access(
+            conn,
+            trip_id,
+            int(user_id)
+        )
 
-        if not trip:
+        if error_response:
+            return error_response, status
+
+        # Only owner can change main trip details
+        if permission != "owner":
             return jsonify({
-                "error": "Trip not found"
-            }), 404
+                "error": "Only the trip owner can update trip details"
+            }), 403
 
-        if budget is None:
-            conn.execute("""
-                UPDATE trips
-                SET name = ?,
-                    start_date = ?,
-                    end_date = ?
-                WHERE id = ?
-            """, (
-                name,
-                start_date,
-                end_date,
-                trip_id
-            ))
-        else:
-            conn.execute("""
-                UPDATE trips
-                SET name = ?,
-                    start_date = ?,
-                    end_date = ?,
-                    budget = ?
-                WHERE id = ?
-            """, (
+        if budget is not None:
+            try:
+                budget = float(budget)
+            except (TypeError, ValueError):
+                return jsonify({
+                    "error": "Budget must be a number"
+                }), 400
+
+            if budget < 0:
+                return jsonify({
+                    "error": "Budget cannot be negative"
+                }), 400
+
+        conn.execute("""
+            UPDATE trips
+            SET name = ?,
+                start_date = ?,
+                end_date = ?,
+                budget = COALESCE(?, budget)
+            WHERE id = ?
+        """, (
+            name,
+            start_date,
+            end_date,
+            budget,
+            trip_id
+        ))
+
+        conn.commit()
+
+        trip = conn.execute("""
+            SELECT
+                id,
+                user_id,
                 name,
                 start_date,
                 end_date,
                 budget,
-                trip_id
-            ))
-
-        conn.commit()
-
-        updated_trip = conn.execute("""
-            SELECT id, user_id, name, start_date, end_date, budget, created_at
+                created_at
             FROM trips
             WHERE id = ?
         """, (trip_id,)).fetchone()
 
         return jsonify({
             "message": "Trip updated successfully",
-            "trip": dict(updated_trip)
+            "trip": dict(trip)
         }), 200
 
     finally:
@@ -984,19 +1071,31 @@ def update_trip(trip_id):
 
 @api.route("/api/trips/<int:trip_id>", methods=["DELETE"])
 def delete_trip(trip_id):
+    data = request.get_json(silent=True) or {}
+
+    user_id = data.get("user_id")
+
+    if user_id is None:
+        return jsonify({
+            "error": "User ID is required"
+        }), 400
+
     conn = get_db_connection()
 
     try:
-        trip = conn.execute("""
-            SELECT id
-            FROM trips
-            WHERE id = ?
-        """, (trip_id,)).fetchone()
+        permission, error_response, status = require_trip_access(
+            conn,
+            trip_id,
+            int(user_id)
+        )
 
-        if not trip:
+        if error_response:
+            return error_response, status
+
+        if permission != "owner":
             return jsonify({
-                "error": "Trip not found"
-            }), 404
+                "error": "Only the trip owner can delete the trip"
+            }), 403
 
         conn.execute("""
             DELETE FROM trips
@@ -1021,48 +1120,18 @@ def update_destination(destination_id):
             "error": "Request body is required"
         }), 400
 
-    name = data.get("name")
-    city = data.get("city")
-    country = data.get("country")
-    visit_date = data.get("visit_date")
-    notes = data.get("notes")
-    latitude = data.get("latitude")
-    longitude = data.get("longitude")
+    user_id = data.get("user_id")
 
-    if not name:
+    if user_id is None:
         return jsonify({
-            "error": "Destination name is required"
+            "error": "User ID is required"
         }), 400
-
-    if latitude is not None or longitude is not None:
-        if latitude is None or longitude is None:
-            return jsonify({
-                "error": "Both latitude and longitude are required"
-            }), 400
-
-        try:
-            latitude = float(latitude)
-            longitude = float(longitude)
-        except (TypeError, ValueError):
-            return jsonify({
-                "error": "Latitude and longitude must be numbers"
-            }), 400
-
-        if not -90 <= latitude <= 90:
-            return jsonify({
-                "error": "Latitude must be between -90 and 90"
-            }), 400
-
-        if not -180 <= longitude <= 180:
-            return jsonify({
-                "error": "Longitude must be between -180 and 180"
-            }), 400
 
     conn = get_db_connection()
 
     try:
         destination = conn.execute("""
-            SELECT id
+            SELECT trip_id
             FROM destinations
             WHERE id = ?
         """, (destination_id,)).fetchone()
@@ -1071,6 +1140,28 @@ def update_destination(destination_id):
             return jsonify({
                 "error": "Destination not found"
             }), 404
+
+        permission, error_response, status = require_editor_access(
+            conn,
+            destination["trip_id"],
+            int(user_id)
+        )
+
+        if error_response:
+            return error_response, status
+
+        name = data.get("name")
+        city = data.get("city")
+        country = data.get("country")
+        visit_date = data.get("visit_date")
+        notes = data.get("notes")
+        latitude = data.get("latitude")
+        longitude = data.get("longitude")
+
+        if not name:
+            return jsonify({
+                "error": "Destination name is required"
+            }), 400
 
         conn.execute("""
             UPDATE destinations
@@ -1118,13 +1209,25 @@ def update_destination(destination_id):
     finally:
         conn.close()
 
-@api.route("/api/destinations/<int:destination_id>", methods=["DELETE"])
+@api.route(
+    "/api/destinations/<int:destination_id>",
+    methods=["DELETE"]
+)
 def delete_destination(destination_id):
+    data = request.get_json(silent=True) or {}
+
+    user_id = data.get("user_id")
+
+    if user_id is None:
+        return jsonify({
+            "error": "User ID is required"
+        }), 400
+
     conn = get_db_connection()
 
     try:
         destination = conn.execute("""
-            SELECT id
+            SELECT trip_id
             FROM destinations
             WHERE id = ?
         """, (destination_id,)).fetchone()
@@ -1133,6 +1236,15 @@ def delete_destination(destination_id):
             return jsonify({
                 "error": "Destination not found"
             }), 404
+
+        permission, error_response, status = require_editor_access(
+            conn,
+            destination["trip_id"],
+            int(user_id)
+        )
+
+        if error_response:
+            return error_response, status
 
         conn.execute("""
             DELETE FROM destinations
@@ -1157,23 +1269,18 @@ def update_itinerary_item(itinerary_id):
             "error": "Request body is required"
         }), 400
 
-    activity = data.get("activity")
-    destination_id = data.get("destination_id")
-    activity_date = data.get("activity_date")
-    start_time = data.get("start_time")
-    end_time = data.get("end_time")
-    notes = data.get("notes")
+    user_id = data.get("user_id")
 
-    if not activity:
+    if user_id is None:
         return jsonify({
-            "error": "Activity is required"
+            "error": "User ID is required"
         }), 400
 
     conn = get_db_connection()
 
     try:
         item = conn.execute("""
-            SELECT id, trip_id
+            SELECT trip_id
             FROM itinerary
             WHERE id = ?
         """, (itinerary_id,)).fetchone()
@@ -1183,6 +1290,28 @@ def update_itinerary_item(itinerary_id):
                 "error": "Itinerary item not found"
             }), 404
 
+        permission, error_response, status = require_editor_access(
+            conn,
+            item["trip_id"],
+            int(user_id)
+        )
+
+        if error_response:
+            return error_response, status
+
+        activity = data.get("activity")
+        destination_id = data.get("destination_id")
+        activity_date = data.get("activity_date")
+        start_time = data.get("start_time")
+        end_time = data.get("end_time")
+        notes = data.get("notes")
+
+        if not activity:
+            return jsonify({
+                "error": "Activity is required"
+            }), 400
+
+        # Make sure destination belongs to the same trip
         if destination_id is not None:
             destination = conn.execute("""
                 SELECT id
@@ -1230,7 +1359,9 @@ def update_itinerary_item(itinerary_id):
                 itinerary.start_time,
                 itinerary.end_time,
                 itinerary.notes,
-                destinations.name AS destination_name
+                destinations.name AS destination_name,
+                destinations.latitude,
+                destinations.longitude
             FROM itinerary
             LEFT JOIN destinations
                 ON itinerary.destination_id = destinations.id
@@ -1254,38 +1385,18 @@ def update_expense(expense_id):
             "error": "Request body is required"
         }), 400
 
-    category = data.get("category")
-    description = data.get("description")
-    amount = data.get("amount")
-    expense_date = data.get("expense_date")
+    user_id = data.get("user_id")
 
-    if not category:
+    if user_id is None:
         return jsonify({
-            "error": "Expense category is required"
-        }), 400
-
-    if amount is None:
-        return jsonify({
-            "error": "Expense amount is required"
-        }), 400
-
-    try:
-        amount = float(amount)
-    except (TypeError, ValueError):
-        return jsonify({
-            "error": "Amount must be a number"
-        }), 400
-
-    if amount <= 0:
-        return jsonify({
-            "error": "Expense amount must be greater than 0"
+            "error": "User ID is required"
         }), 400
 
     conn = get_db_connection()
 
     try:
         expense = conn.execute("""
-            SELECT id
+            SELECT trip_id
             FROM expenses
             WHERE id = ?
         """, (expense_id,)).fetchone()
@@ -1295,17 +1406,48 @@ def update_expense(expense_id):
                 "error": "Expense not found"
             }), 404
 
+        permission, error_response, status = require_editor_access(
+            conn,
+            expense["trip_id"],
+            int(user_id)
+        )
+
+        if error_response:
+            return error_response, status
+
+        category = data.get("category")
+        amount = data.get("amount")
+        description = data.get("description")
+        expense_date = data.get("expense_date")
+
+        if amount is None:
+            return jsonify({
+                "error": "Amount is required"
+            }), 400
+
+        try:
+            amount = float(amount)
+        except (TypeError, ValueError):
+            return jsonify({
+                "error": "Amount must be a number"
+            }), 400
+
+        if amount < 0:
+            return jsonify({
+                "error": "Amount cannot be negative"
+            }), 400
+
         conn.execute("""
             UPDATE expenses
             SET category = ?,
-                description = ?,
                 amount = ?,
+                description = ?,
                 expense_date = ?
             WHERE id = ?
         """, (
             category,
-            description,
             amount,
+            description,
             expense_date,
             expense_id
         ))
@@ -1317,10 +1459,9 @@ def update_expense(expense_id):
                 id,
                 trip_id,
                 category,
-                description,
                 amount,
-                expense_date,
-                created_at
+                description,
+                expense_date
             FROM expenses
             WHERE id = ?
         """, (expense_id,)).fetchone()
@@ -1332,6 +1473,58 @@ def update_expense(expense_id):
 
     finally:
         conn.close()
+
+@api.route(
+    "/api/expenses/<int:expense_id>",
+    methods=["DELETE"]
+)
+def delete_expense(expense_id):
+    data = request.get_json(silent=True) or {}
+
+    user_id = data.get("user_id")
+
+    if user_id is None:
+        return jsonify({
+            "error": "User ID is required"
+        }), 400
+
+    conn = get_db_connection()
+
+    try:
+        expense = conn.execute("""
+            SELECT trip_id
+            FROM expenses
+            WHERE id = ?
+        """, (expense_id,)).fetchone()
+
+        if not expense:
+            return jsonify({
+                "error": "Expense not found"
+            }), 404
+
+        permission, error_response, status = require_editor_access(
+            conn,
+            expense["trip_id"],
+            int(user_id)
+        )
+
+        if error_response:
+            return error_response, status
+
+        conn.execute("""
+            DELETE FROM expenses
+            WHERE id = ?
+        """, (expense_id,))
+
+        conn.commit()
+
+        return jsonify({
+            "message": "Expense deleted successfully"
+        }), 200
+
+    finally:
+        conn.close()
+
 
 @api.route("/api/trips/<int:trip_id>/share", methods=["POST"])
 def create_share_link(trip_id):
