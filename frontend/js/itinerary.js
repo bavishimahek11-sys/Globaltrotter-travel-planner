@@ -98,7 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // ==========================================================================
   async function loadTripData() {
     if (!tripId) {
-      renderNoTripState();
+      await renderTripSelector();
       return;
     }
 
@@ -107,7 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       currentTrip = await API.getTripById(tripId);
       if (!currentTrip) {
-        renderNoTripState();
+        await renderTripSelector();
         return;
       }
 
@@ -115,8 +115,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
       renderTripDetails();
       renderItinerary();
-      renderBudgetAndExpenses();
-      renderTripMap();
       renderCollaborators();
       applyRolePermissions();
     } catch (err) {
@@ -159,23 +157,96 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  function renderNoTripState() {
-    if (tripSummaryCard) {
+  async function renderTripSelector() {
+    if (openAddActivityBtn) openAddActivityBtn.style.display = 'none';
+    if (openInviteModalBtn) openInviteModalBtn.style.display = 'none';
+    const collabSection = document.getElementById('collaboratorsSection');
+    if (collabSection) collabSection.style.display = 'none';
+    const itinSection = document.querySelector('.itinerary-section');
+    if (itinSection) itinSection.style.display = 'none';
+
+    if (!tripSummaryCard) return;
+
+    tripSummaryCard.innerHTML = `
+      <div class="state-box" style="padding: 3rem 2rem;">
+        <div class="spinner"></div>
+        <div class="state-title">Loading your trips...</div>
+        <div class="state-desc">Fetching saved travel plans from the database.</div>
+      </div>
+    `;
+
+    try {
+      const trips = await API.getTrips();
+      if (!trips || !Array.isArray(trips) || trips.length === 0) {
+        tripSummaryCard.innerHTML = `
+          <div class="state-box" style="padding: 2.5rem 1.5rem;">
+            <span class="state-icon">🎒</span>
+            <div class="state-title">No trips yet.</div>
+            <div class="state-desc">Plan your first trip to build your personalized day-by-day itinerary.</div>
+            <div style="margin-top: 1.25rem;">
+              <a href="create-trip.html" class="btn btn-primary btn-sm"><span>✨</span> Plan a Trip</a>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      let tripsGridHtml = '';
+      trips.forEach(t => {
+        const dest = t.destination || (t.fromCity && t.toCity ? `${t.fromCity} ➔ ${t.toCity}` : 'Destination');
+        const dates = (t.startDate && t.endDate) ? `${formatDate(t.startDate)} – ${formatDate(t.endDate)}` : (t.startDate ? formatDate(t.startDate) : 'Dates flexible');
+        const actCount = t.itinerary && Array.isArray(t.itinerary) ? t.itinerary.length : 0;
+
+        tripsGridHtml += `
+          <div class="trip-card" style="border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.25rem; background: var(--bg-surface); display: flex; flex-direction: column; justify-content: space-between; gap: 1rem;">
+            <div>
+              <h3 style="font-size: 1.15rem; margin-bottom: 0.35rem; color: var(--text-color);">${escapeHtml(t.title || t.name || 'Trip')}</h3>
+              <div style="color: var(--primary); font-size: 0.9rem; font-weight: 500; margin-bottom: 0.75rem;">📍 ${escapeHtml(dest)}</div>
+              <div style="font-size: 0.85rem; color: var(--text-muted); display: flex; flex-direction: column; gap: 0.25rem;">
+                <div>🗓️ <strong>Dates:</strong> ${dates}</div>
+                <div>⏱️ <strong>Duration:</strong> ${escapeHtml(t.duration || 'Flexible')}</div>
+                <div>📋 <strong>Activities:</strong> ${actCount} scheduled</div>
+              </div>
+            </div>
+            <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+              <a href="itinerary.html?id=${encodeURIComponent(t.id)}" class="btn btn-sm btn-primary">
+                <span>📋</span> View Itinerary
+              </a>
+            </div>
+          </div>
+        `;
+      });
+
+      tripSummaryCard.innerHTML = `
+        <div style="margin-bottom: 1.5rem;">
+          <h2 class="section-title" style="margin-bottom: 0.25rem;"><span>📋</span> Select a Trip to View Itinerary</h2>
+          <p class="section-subtitle">Choose one of your saved journeys to manage activities, timing, and travel notes.</p>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.25rem; margin-bottom: 2rem;">
+          ${tripsGridHtml}
+        </div>
+        <div style="text-align: center; padding-top: 1.5rem; border-top: 1px solid var(--border-color);">
+          <a href="create-trip.html" class="btn btn-outline">
+            <span>+</span> Plan a New Trip
+          </a>
+        </div>
+      `;
+    } catch (err) {
       tripSummaryCard.innerHTML = `
         <div class="state-box" style="padding: 2.5rem 1.5rem;">
-          <span class="state-icon">🎒</span>
-          <div class="state-title">No Trip Selected</div>
-          <div class="state-desc">Select a trip from your saved trips or plan a new trip to view the itinerary.</div>
+          <span class="state-icon">⚠️</span>
+          <div class="state-title">Unable to load your trips.</div>
+          <div class="state-desc">Could not connect to the backend server. Please verify your connection.</div>
           <div style="margin-top: 1.25rem;">
-            <a href="create-trip.html" class="btn btn-primary btn-sm">Plan a Trip</a>
+            <button type="button" id="retryTripSelectorBtn" class="btn btn-primary btn-sm">
+              <span>🔄</span> Try again
+            </button>
           </div>
         </div>
       `;
+      const retryBtn = document.getElementById('retryTripSelectorBtn');
+      if (retryBtn) retryBtn.addEventListener('click', renderTripSelector);
     }
-    if (openAddActivityBtn) openAddActivityBtn.style.display = 'none';
-    if (openAddExpenseBtn) openAddExpenseBtn.style.display = 'none';
-    if (openInviteModalBtn) openInviteModalBtn.style.display = 'none';
-    if (mapEmptyState) mapEmptyState.style.display = 'block';
   }
 
   // ==========================================================================
@@ -206,6 +277,12 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
         </div>
         <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+          <a href="budget.html?id=${encodeURIComponent(currentTrip.id)}" class="btn btn-sm btn-outline" title="Open trip budget">
+            <span>💰</span> View Budget
+          </a>
+          <a href="map.html?id=${encodeURIComponent(currentTrip.id)}" class="btn btn-sm btn-outline" title="Open trip map">
+            <span>🗺️</span> View Map
+          </a>
           <button type="button" id="openShareModalBtn" class="btn btn-sm btn-outline">
             <span>🔗</span> Share Trip
           </button>

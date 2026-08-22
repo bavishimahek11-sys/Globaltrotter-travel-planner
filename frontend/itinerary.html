@@ -54,34 +54,12 @@
       <!-- Top Alert Notification Area -->
       <div id="pageAlertContainer"></div>
 
-      <!-- 1. Trip Details & Summary Card -->
+      <!-- 1. Trip Details & Summary Card with Budget & Map Action Buttons -->
       <section id="tripSummaryCard" class="trip-details-header">
         <!-- Rendered dynamically via js/itinerary.js -->
       </section>
 
-      <!-- 2. Interactive Route Map Section -->
-      <section id="mapSection" class="map-section">
-        <div class="itinerary-section-header">
-          <div>
-            <h2 class="section-title">
-              <span>🗺️</span> Interactive Route Map
-            </h2>
-            <p class="section-subtitle" style="margin-bottom: 0;">Visualize your destinations, itinerary places, and sequenced route path.</p>
-          </div>
-          <span id="mapPointsBadge" class="map-badge-info">0 locations plotted</span>
-        </div>
-
-        <div class="map-card-wrapper">
-          <div id="tripMap" class="map-container"></div>
-          <div id="mapEmptyState" class="state-box" style="display: none; border-radius: 0; padding: 2.5rem 1.5rem; border: none; border-top: 1px dashed var(--border-color);">
-            <span class="state-icon">📍</span>
-            <div class="state-title">Location data is not available for this trip</div>
-            <div class="state-desc">No coordinates have been recorded for your scheduled activities yet. Add activities with latitude and longitude coordinates to visualize your travel sequence on the map.</div>
-          </div>
-        </div>
-      </section>
-
-      <!-- 3. Itinerary Section -->
+      <!-- 2. Day-by-Day Itinerary Section -->
       <section class="itinerary-section">
         
         <div class="itinerary-section-header">
@@ -89,7 +67,7 @@
             <h2 class="section-title">
               <span>📅</span> Day-by-Day Itinerary
             </h2>
-            <p class="section-subtitle" style="margin-bottom: 0;">Organize and track your planned activities for each day of the journey.</p>
+            <p class="section-subtitle" style="margin-bottom: 0;">Organize and track your planned activities, locations, and notes for each day.</p>
           </div>
 
           <div>
@@ -106,52 +84,7 @@
 
       </section>
 
-      <!-- 4. Budget Tracking & Expenses Section -->
-      <section id="budgetSection" class="budget-section">
-        
-        <div class="itinerary-section-header">
-          <div>
-            <h2 class="section-title">
-              <span>💰</span> Budget Tracking & Expenses
-            </h2>
-            <p class="section-subtitle" style="margin-bottom: 0;">Monitor your spending, manage expense entries, and stay within your travel budget.</p>
-          </div>
-
-          <div>
-            <button type="button" id="openAddExpenseBtn" class="btn btn-primary">
-              <span>+</span> Add Expense
-            </button>
-          </div>
-        </div>
-
-        <!-- Budget Summary Box with Progress Bar -->
-        <div id="budgetSummaryBox" class="budget-summary-card">
-          <!-- Rendered dynamically via js/itinerary.js -->
-        </div>
-
-        <!-- Category Breakdown -->
-        <div id="categoryBreakdownCard" class="categories-breakdown-card" style="display: none;">
-          <h3 class="section-title" style="font-size: 1.1rem;">
-            <span>📊</span> Expense Category Breakdown
-          </h3>
-          <div id="categoriesList" class="category-list">
-            <!-- Rendered dynamically via js/itinerary.js -->
-          </div>
-        </div>
-
-        <!-- Expense List Container -->
-        <div>
-          <h3 class="section-title" style="font-size: 1.15rem; margin-bottom: 1rem;">
-            <span>🧾</span> Recorded Expenses
-          </h3>
-          <div id="expensesContainer">
-            <!-- Rendered dynamically via js/itinerary.js -->
-          </div>
-        </div>
-
-      </section>
-
-      <!-- 5. Trip Collaborators Section -->
+      <!-- 3. Trip Collaborators Section -->
       <section id="collaboratorsSection" class="collaborators-section">
         <div class="itinerary-section-header">
           <div>
