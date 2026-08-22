@@ -26,14 +26,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function loadMapData() {
     if (!tripId) {
-      renderNoTripState();
+      await renderTripSelector();
       return;
     }
 
     try {
       currentTrip = await API.getTripById(tripId);
       if (!currentTrip) {
-        renderNoTripState();
+        await renderTripSelector();
         return;
       }
       initStandaloneMap();
@@ -41,21 +41,6 @@ document.addEventListener('DOMContentLoaded', () => {
       console.warn('Map trip data loading error:', err.message);
       renderErrorState();
     }
-  }
-
-  function renderNoTripState() {
-    if (standaloneMapEmptyState) {
-      standaloneMapEmptyState.style.display = 'block';
-      standaloneMapEmptyState.innerHTML = `
-        <span class="state-icon">🎒</span>
-        <div class="state-title">No Trip Selected</div>
-        <div class="state-desc">Select a trip from your dashboard or plan a new trip to visualize your route on the map.</div>
-        <div style="margin-top: 1.25rem;">
-          <a href="create-trip.html" class="btn btn-primary btn-sm">Plan a Trip</a>
-        </div>
-      `;
-    }
-    if (standaloneMapBadge) standaloneMapBadge.textContent = '0 locations';
   }
 
   function renderErrorState() {
@@ -79,12 +64,127 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  async function renderTripSelector() {
+    const cardEl = document.querySelector('.main-content .card');
+    if (!cardEl) return;
+
+    if (mapHeroTitle) mapHeroTitle.textContent = 'Interactive Route Map';
+    const subtitleEl = document.getElementById('mapHeroSubtitle');
+    if (subtitleEl) subtitleEl.textContent = 'Select one of your saved trips to visualize its route, stops, and waypoints.';
+
+    cardEl.innerHTML = `
+      <div class="state-box" style="padding: 3rem 1.5rem;">
+        <div class="spinner"></div>
+        <div class="state-title">Loading your trips...</div>
+        <div class="state-desc">Fetching your saved travel plans from the database.</div>
+      </div>
+    `;
+
+    try {
+      const trips = await API.getTrips();
+      if (!trips || !Array.isArray(trips) || trips.length === 0) {
+        cardEl.innerHTML = `
+          <div class="state-box" style="padding: 2.5rem 1.5rem;">
+            <span class="state-icon">🎒</span>
+            <div class="state-title">No trips yet.</div>
+            <div class="state-desc">Plan your first trip to view its interactive route map.</div>
+            <div style="margin-top: 1.25rem;">
+              <a href="create-trip.html" class="btn btn-primary btn-sm"><span>✨</span> Plan a Trip</a>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      let tripsGridHtml = '';
+      trips.forEach(t => {
+        const dest = t.destination || (t.fromCity && t.toCity ? `${t.fromCity} ➔ ${t.toCity}` : 'Destination');
+        const dates = (t.startDate && t.endDate) ? `${formatDate(t.startDate)} – ${formatDate(t.endDate)}` : (t.startDate ? formatDate(t.startDate) : 'Dates flexible');
+        const stopsCount = t.addedStops && Array.isArray(t.addedStops) ? t.addedStops.length : 0;
+
+        tripsGridHtml += `
+          <div class="trip-card" style="border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.25rem; background: var(--bg-surface); display: flex; flex-direction: column; justify-content: space-between; gap: 1rem;">
+            <div>
+              <h3 style="font-size: 1.15rem; margin-bottom: 0.35rem; color: var(--text-color);">${escapeHtml(t.title || t.name || 'Trip')}</h3>
+              <div style="color: var(--primary); font-size: 0.9rem; font-weight: 500; margin-bottom: 0.75rem;">📍 ${escapeHtml(dest)}</div>
+              <div style="font-size: 0.85rem; color: var(--text-muted); display: flex; flex-direction: column; gap: 0.25rem;">
+                <div>🗓️ <strong>Dates:</strong> ${dates}</div>
+                <div>⏱️ <strong>Duration:</strong> ${escapeHtml(t.duration || 'Flexible')}</div>
+                <div>✨ <strong>Stops:</strong> ${stopsCount} planned</div>
+              </div>
+            </div>
+            <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+              <a href="map.html?id=${encodeURIComponent(t.id)}" class="btn btn-sm btn-primary">
+                <span>🗺️</span> View Map ➔
+              </a>
+            </div>
+          </div>
+        `;
+      });
+
+      cardEl.innerHTML = `
+        <div style="margin-bottom: 1.5rem;">
+          <h2 class="section-title" style="margin-bottom: 0.25rem;"><span>🗺️</span> Select a Trip to View Route Map</h2>
+          <p class="section-subtitle">Choose a journey below to explore route markers, waypoints, and geographic paths.</p>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.25rem; margin-bottom: 2rem;">
+          ${tripsGridHtml}
+        </div>
+        <div style="text-align: center; padding-top: 1.5rem; border-top: 1px solid var(--border-color);">
+          <a href="create-trip.html" class="btn btn-outline">
+            <span>+</span> Plan a New Trip
+          </a>
+        </div>
+      `;
+    } catch (err) {
+      cardEl.innerHTML = `
+        <div class="state-box" style="padding: 2.5rem 1.5rem;">
+          <span class="state-icon">⚠️</span>
+          <div class="state-title">Unable to load your trips.</div>
+          <div class="state-desc">Could not connect to the backend server. Please verify your connection.</div>
+          <div style="margin-top: 1.25rem;">
+            <button type="button" id="retryMapSelectorBtn" class="btn btn-primary btn-sm">
+              <span>🔄</span> Try again
+            </button>
+          </div>
+        </div>
+      `;
+      const retryBtn = document.getElementById('retryMapSelectorBtn');
+      if (retryBtn) retryBtn.addEventListener('click', renderTripSelector);
+    }
+  }
+
+  function formatDate(dateStr) {
+    if (!dateStr) return '';
+    try {
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        const d = new Date(parts[0], parts[1] - 1, parts[2]);
+        return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+      }
+      return dateStr;
+    } catch (e) {
+      return dateStr;
+    }
+  }
+
   function initStandaloneMap() {
     if (!standaloneMapEl || typeof L === 'undefined' || !currentTrip) return;
 
     const title = currentTrip.title || `Trip to ${currentTrip.toCity || 'Destination'}`;
     if (mapHeroTitle) mapHeroTitle.textContent = `${title} — Map`;
-    if (mapTripInfo) mapTripInfo.textContent = `Route: ${currentTrip.fromCity || 'Origin'} ➔ ${currentTrip.toCity || 'Destination'}`;
+    if (mapTripInfo) {
+      mapTripInfo.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; width: 100%;">
+          <span>📍 Route: <strong>${escapeHtml(currentTrip.fromCity || 'Origin')} ➔ ${escapeHtml(currentTrip.toCity || 'Destination')}</strong></span>
+          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <a href="map.html" class="btn btn-sm btn-outline"><span>←</span> Change Trip</a>
+            <a href="itinerary.html?id=${encodeURIComponent(currentTrip.id)}" class="btn btn-sm btn-outline"><span>📋</span> View Itinerary</a>
+            <a href="budget.html?id=${encodeURIComponent(currentTrip.id)}" class="btn btn-sm btn-outline"><span>💰</span> View Budget</a>
+          </div>
+        </div>
+      `;
+    }
 
     try {
       if (!mapInstance) {

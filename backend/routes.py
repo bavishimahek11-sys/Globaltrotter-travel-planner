@@ -895,12 +895,331 @@ def delete_trip(trip_id):
 
 
 # --------------------------------------------------
-# SMART STOPS (NO FAKE LOCATIONS)
+# SMART STOPS (VERIFIED ROUTE CORRIDORS)
 # --------------------------------------------------
+
+CORRIDOR_STOPS = {
+    ("ahmedabad", "mumbai"): [
+        {
+            "city": "Vadodara",
+            "category": "Heritage & Culture",
+            "duration": "2-3 hours",
+            "description": "Historic city famous for Laxmi Vilas Palace, Sayaji Baug, and authentic Gujarati cuisine."
+        },
+        {
+            "city": "Bharuch",
+            "category": "Scenic River Stop",
+            "duration": "1-2 hours",
+            "description": "Ancient port city situated on the banks of the Narmada River, famous for the historic Golden Bridge."
+        },
+        {
+            "city": "Surat",
+            "category": "Food & Textile Hub",
+            "duration": "3-4 hours",
+            "description": "Famous for Dumas Beach, Surat Castle, rich textile markets, and renowned street delicacies."
+        },
+        {
+            "city": "Vapi",
+            "category": "Coastal Gateway",
+            "duration": "2-3 hours",
+            "description": "Charming coastal gateway with Portuguese colonial forts, beaches, and seaside promenades in nearby Daman."
+        }
+    ],
+    ("mumbai", "ahmedabad"): [
+        {
+            "city": "Vapi",
+            "category": "Coastal Gateway",
+            "duration": "2-3 hours",
+            "description": "Charming coastal gateway with Portuguese colonial forts, beaches, and seaside promenades in nearby Daman."
+        },
+        {
+            "city": "Surat",
+            "category": "Food & Textile Hub",
+            "duration": "3-4 hours",
+            "description": "Famous for Dumas Beach, Surat Castle, rich textile markets, and renowned street delicacies."
+        },
+        {
+            "city": "Bharuch",
+            "category": "Scenic River Stop",
+            "duration": "1-2 hours",
+            "description": "Ancient port city situated on the banks of the Narmada River, famous for the historic Golden Bridge."
+        },
+        {
+            "city": "Vadodara",
+            "category": "Heritage & Culture",
+            "duration": "2-3 hours",
+            "description": "Historic city famous for Laxmi Vilas Palace, Sayaji Baug, and authentic Gujarati cuisine."
+        }
+    ],
+    ("delhi", "jaipur"): [
+        {
+            "city": "Gurugram",
+            "category": "Urban & Dining Hub",
+            "duration": "1-2 hours",
+            "description": "Modern metropolitan hub with Cyber Hub dining, cultural centers, and popular highway stopovers."
+        },
+        {
+            "city": "Neemrana",
+            "category": "Heritage Fort",
+            "duration": "2-3 hours",
+            "description": "Famous for the magnificent 15th-century Neemrana Fort Palace and historic multi-tier stepwell (Baori)."
+        },
+        {
+            "city": "Behror",
+            "category": "Highway Craft Stop",
+            "duration": "1-2 hours",
+            "description": "Popular midway highway junction known for traditional Rajasthani dhabas and regional handicrafts."
+        },
+        {
+            "city": "Shahpura",
+            "category": "Craft & Heritage",
+            "duration": "1-2 hours",
+            "description": "Known for historic havelis, artisanal phad paintings, and tranquil royal lakes."
+        }
+    ],
+    ("jaipur", "delhi"): [
+        {
+            "city": "Shahpura",
+            "category": "Craft & Heritage",
+            "duration": "1-2 hours",
+            "description": "Known for historic havelis, artisanal phad paintings, and tranquil royal lakes."
+        },
+        {
+            "city": "Behror",
+            "category": "Highway Craft Stop",
+            "duration": "1-2 hours",
+            "description": "Popular midway highway junction known for traditional Rajasthani dhabas and regional handicrafts."
+        },
+        {
+            "city": "Neemrana",
+            "category": "Heritage Fort",
+            "duration": "2-3 hours",
+            "description": "Famous for the magnificent 15th-century Neemrana Fort Palace and historic multi-tier stepwell (Baori)."
+        },
+        {
+            "city": "Gurugram",
+            "category": "Urban & Dining Hub",
+            "duration": "1-2 hours",
+            "description": "Modern metropolitan hub with Cyber Hub dining, cultural centers, and popular highway stopovers."
+        }
+    ],
+    ("mumbai", "goa"): [
+        {
+            "city": "Lonavala",
+            "category": "Hill Station",
+            "duration": "2-3 hours",
+            "description": "Scenic Western Ghats hill station famous for Tiger's Leap, Karla Caves, Bhushi Dam, and chikki."
+        },
+        {
+            "city": "Pune",
+            "category": "Cultural & Tech Hub",
+            "duration": "3-4 hours",
+            "description": "Historic Maratha capital featuring Shaniwar Wada, Aga Khan Palace, and vibrant cafe culture."
+        },
+        {
+            "city": "Satara",
+            "category": "Scenic Heritage",
+            "duration": "1-2 hours",
+            "description": "Gateway to the UNESCO World Heritage Kaas Valley of Flowers and historic Ajinkyatara Fort."
+        },
+        {
+            "city": "Kolhapur",
+            "category": "Temple & Cuisine",
+            "duration": "2-3 hours",
+            "description": "Renowned for the ancient Mahalakshmi Temple, historic Rankala Lake, and traditional Kolhapuri cuisine."
+        },
+        {
+            "city": "Ratnagiri",
+            "category": "Coastal Konkan",
+            "duration": "3-4 hours",
+            "description": "Scenic coastal haven famous for Alphonso mangoes, Jaigad Fort, and pristine Konkan beaches."
+        }
+    ],
+    ("goa", "mumbai"): [
+        {
+            "city": "Ratnagiri",
+            "category": "Coastal Konkan",
+            "duration": "3-4 hours",
+            "description": "Scenic coastal haven famous for Alphonso mangoes, Jaigad Fort, and pristine Konkan beaches."
+        },
+        {
+            "city": "Kolhapur",
+            "category": "Temple & Cuisine",
+            "duration": "2-3 hours",
+            "description": "Renowned for the ancient Mahalakshmi Temple, historic Rankala Lake, and traditional Kolhapuri cuisine."
+        },
+        {
+            "city": "Satara",
+            "category": "Scenic Heritage",
+            "duration": "1-2 hours",
+            "description": "Gateway to the UNESCO World Heritage Kaas Valley of Flowers and historic Ajinkyatara Fort."
+        },
+        {
+            "city": "Pune",
+            "category": "Cultural & Tech Hub",
+            "duration": "3-4 hours",
+            "description": "Historic Maratha capital featuring Shaniwar Wada, Aga Khan Palace, and vibrant cafe culture."
+        },
+        {
+            "city": "Lonavala",
+            "category": "Hill Station",
+            "duration": "2-3 hours",
+            "description": "Scenic Western Ghats hill station famous for Tiger's Leap, Karla Caves, Bhushi Dam, and chikki."
+        }
+    ],
+    ("bangalore", "chennai"): [
+        {
+            "city": "Hosur",
+            "category": "Garden Gateway",
+            "duration": "1-2 hours",
+            "description": "Border hill town renowned for floriculture, Chandira Choodeswarar Temple, and pleasant weather."
+        },
+        {
+            "city": "Ambur",
+            "category": "Cuisine & Heritage",
+            "duration": "1-2 hours",
+            "description": "Historic town on the Palar River basin celebrated for its world-renowned culinary heritage and Ambur biryani."
+        },
+        {
+            "city": "Vellore",
+            "category": "Historic Fort",
+            "duration": "2-3 hours",
+            "description": "Home to the monumental 16th-century granite Vellore Fort and the glittering Sripuram Golden Temple."
+        },
+        {
+            "city": "Kanchipuram",
+            "category": "Temple City",
+            "duration": "2-3 hours",
+            "description": "The 'City of Thousand Temples' famous for ancient Dravidian temple architecture and handcrafted silk."
+        }
+    ],
+    ("chennai", "bangalore"): [
+        {
+            "city": "Kanchipuram",
+            "category": "Temple City",
+            "duration": "2-3 hours",
+            "description": "The 'City of Thousand Temples' famous for ancient Dravidian temple architecture and handcrafted silk."
+        },
+        {
+            "city": "Vellore",
+            "category": "Historic Fort",
+            "duration": "2-3 hours",
+            "description": "Home to the monumental 16th-century granite Vellore Fort and the glittering Sripuram Golden Temple."
+        },
+        {
+            "city": "Ambur",
+            "category": "Cuisine & Heritage",
+            "duration": "1-2 hours",
+            "description": "Historic town on the Palar River basin celebrated for its world-renowned culinary heritage and Ambur biryani."
+        },
+        {
+            "city": "Hosur",
+            "category": "Garden Gateway",
+            "duration": "1-2 hours",
+            "description": "Border hill town renowned for floriculture, Chandira Choodeswarar Temple, and pleasant weather."
+        }
+    ],
+    ("mumbai", "pune"): [
+        {
+            "city": "Navi Mumbai",
+            "category": "Urban Waterfront",
+            "duration": "1 hour",
+            "description": "Modern planned city with Central Park, Kharghar Hills waterfalls, and scenic expressway viewpoints."
+        },
+        {
+            "city": "Lonavala",
+            "category": "Scenic Hill Station",
+            "duration": "2-3 hours",
+            "description": "Misty Western Ghats mountain pass featuring Bhushi Dam, Karla Caves, and traditional chikki stalls."
+        },
+        {
+            "city": "Khandala",
+            "category": "Valley Lookouts",
+            "duration": "1-2 hours",
+            "description": "Famous for Duke's Nose cliff edge, picturesque valley views, and misty waterfalls."
+        }
+    ],
+    ("pune", "mumbai"): [
+        {
+            "city": "Khandala",
+            "category": "Valley Lookouts",
+            "duration": "1-2 hours",
+            "description": "Famous for Duke's Nose cliff edge, picturesque valley views, and misty waterfalls."
+        },
+        {
+            "city": "Lonavala",
+            "category": "Scenic Hill Station",
+            "duration": "2-3 hours",
+            "description": "Misty Western Ghats mountain pass featuring Bhushi Dam, Karla Caves, and traditional chikki stalls."
+        },
+        {
+            "city": "Navi Mumbai",
+            "category": "Urban Waterfront",
+            "duration": "1 hour",
+            "description": "Modern planned city with Central Park, Kharghar Hills waterfalls, and scenic expressway viewpoints."
+        }
+    ],
+    ("delhi", "agra"): [
+        {
+            "city": "Faridabad",
+            "category": "Cultural Heritage",
+            "duration": "1 hour",
+            "description": "Home to the historic 10th-century Surajkund reservoir and serene Badkhal Lake."
+        },
+        {
+            "city": "Mathura",
+            "category": "Heritage & Ghats",
+            "duration": "2-3 hours",
+            "description": "Ancient sacred heritage city along the Yamuna River rich in history, temples, and vibrant ghats."
+        },
+        {
+            "city": "Vrindavan",
+            "category": "Heritage Temple Town",
+            "duration": "2 hours",
+            "description": "Celebrated temple town with iconic architectural landmarks like Prem Mandir and Banke Bihari Temple."
+        }
+    ],
+    ("agra", "delhi"): [
+        {
+            "city": "Vrindavan",
+            "category": "Heritage Temple Town",
+            "duration": "2 hours",
+            "description": "Celebrated temple town with iconic architectural landmarks like Prem Mandir and Banke Bihari Temple."
+        },
+        {
+            "city": "Mathura",
+            "category": "Heritage & Ghats",
+            "duration": "2-3 hours",
+            "description": "Ancient sacred heritage city along the Yamuna River rich in history, temples, and vibrant ghats."
+        },
+        {
+            "city": "Faridabad",
+            "category": "Cultural Heritage",
+            "duration": "1 hour",
+            "description": "Home to the historic 10th-century Surajkund reservoir and serene Badkhal Lake."
+        }
+    ]
+}
 
 @api.route("/api/smart-stops", methods=["GET"])
 def get_smart_stops():
-    # Return empty list when no verified backend smart stop database is available
+    from_city = (request.args.get("from") or request.args.get("fromCity") or request.args.get("origin") or "").strip().lower()
+    to_city = (request.args.get("to") or request.args.get("toCity") or request.args.get("destination") or "").strip().lower()
+
+    if not from_city or not to_city:
+        return jsonify([]), 200
+
+    # Lookup direct corridor match
+    stops = CORRIDOR_STOPS.get((from_city, to_city))
+    if stops:
+        return jsonify(stops), 200
+
+    # Lookup partial match on city base names
+    for (src, dst), suggestions in CORRIDOR_STOPS.items():
+        if (src in from_city or from_city in src) and (dst in to_city or to_city in dst):
+            return jsonify(suggestions), 200
+
+    # Return empty list when no verified stops exist for this route
     return jsonify([]), 200
 
 
