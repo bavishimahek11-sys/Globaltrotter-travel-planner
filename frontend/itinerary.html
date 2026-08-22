@@ -3,13 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Trip Itinerary - GlobalTrotter</title>
+  <title>Trip Details & Itinerary - GlobalTrotter</title>
+  <!-- Stylesheets -->
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/responsive.css">
 </head>
 <body>
 
-  <!-- Site Header -->
+  <!-- Site Header & Navigation -->
   <header class="site-header">
     <div class="container navbar">
       <a href="index.html" class="brand-logo">
@@ -30,42 +31,137 @@
     </div>
   </header>
 
-  <!-- Hero Header -->
+  <!-- Page Hero Header -->
   <section class="page-hero">
     <div class="container">
-      <h1>Your Travel Itinerary</h1>
-      <p>Review the stops along your route and organize your schedule.</p>
+      <h1 id="pageHeroTitle">Trip Details & Itinerary</h1>
+      <p id="pageHeroSubtitle">Manage your day-by-day activities, explore scheduled stops, and personalize your journey.</p>
     </div>
   </section>
 
   <!-- Main Content -->
   <main class="main-content">
     <div class="container">
-      <div class="card" style="max-width: 800px; margin: 0 auto;">
+      
+      <!-- Top Alert Notification Area -->
+      <div id="pageAlertContainer"></div>
+
+      <!-- 1. Trip Details & Summary Card -->
+      <section id="tripSummaryCard" class="trip-details-header">
+        <!-- Rendered dynamically via js/itinerary.js -->
+      </section>
+
+      <!-- 2. Itinerary Section -->
+      <section class="itinerary-section">
         
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-          <h2 class="section-title">
-            <span>📋</span> Planned Stops
-          </h2>
-          <a href="create-trip.html" class="btn btn-sm btn-primary">
-            <span>+</span> Add More Stops
-          </a>
+        <div class="itinerary-section-header">
+          <div>
+            <h2 class="section-title">
+              <span>📅</span> Day-by-Day Itinerary
+            </h2>
+            <p class="section-subtitle" style="margin-bottom: 0;">Organize and track your planned activities for each day of the journey.</p>
+          </div>
+
+          <div>
+            <button type="button" id="openAddActivityBtn" class="btn btn-primary">
+              <span>+</span> Add Activity
+            </button>
+          </div>
         </div>
 
-        <div id="itineraryContent">
-          <!-- Dynamic itinerary items from session storage -->
+        <!-- Dynamic Itinerary Activities Container -->
+        <div id="itineraryDaysContainer">
+          <!-- Rendered dynamically via js/itinerary.js -->
         </div>
 
-      </div>
+      </section>
+
     </div>
   </main>
 
+  <!-- Add / Edit Activity Modal Dialog -->
+  <div id="activityModal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h3 id="modalTitle" class="modal-title">Add Activity</h3>
+        <button type="button" id="closeModalBtn" class="modal-close-btn" aria-label="Close dialog">✕</button>
+      </div>
+
+      <!-- Modal Form Body -->
+      <form id="activityForm">
+        <div class="modal-body">
+          
+          <!-- Modal Validation Alerts -->
+          <div id="modalAlertContainer"></div>
+
+          <!-- Hidden Input for Editing Item ID -->
+          <input type="hidden" id="editingActivityId" value="">
+
+          <!-- Date & Time Row -->
+          <div class="form-row">
+            <div class="form-group">
+              <label for="activityDate" class="form-label">
+                <span>🗓️</span> Date <span style="color: var(--danger);">*</span>
+              </label>
+              <input type="date" id="activityDate" class="form-control" required>
+            </div>
+
+            <div class="form-group">
+              <label for="activityTime" class="form-label">
+                <span>⏰</span> Time
+              </label>
+              <input type="time" id="activityTime" class="form-control">
+            </div>
+          </div>
+
+          <!-- Activity Name -->
+          <div class="form-group">
+            <label for="activityName" class="form-label">
+              <span>📌</span> Activity / Place Name <span style="color: var(--danger);">*</span>
+            </label>
+            <input type="text" id="activityName" class="form-control" placeholder="e.g. Visit Laxmi Vilas Palace" required>
+          </div>
+
+          <!-- Location -->
+          <div class="form-group">
+            <label for="activityLocation" class="form-label">
+              <span>📍</span> Location <span style="color: var(--danger);">*</span>
+            </label>
+            <input type="text" id="activityLocation" class="form-control" placeholder="e.g. Vadodara, Gujarat" required>
+          </div>
+
+          <!-- Notes -->
+          <div class="form-group">
+            <label for="activityNotes" class="form-label">
+              <span>📝</span> Notes & Sightseeing Details
+            </label>
+            <textarea id="activityNotes" class="form-control" rows="3" placeholder="Add entry ticket info, opening hours, or special tips..."></textarea>
+          </div>
+
+        </div>
+
+        <!-- Modal Footer Actions -->
+        <div class="modal-footer">
+          <button type="button" id="cancelModalBtn" class="btn btn-outline">Cancel</button>
+          <button type="submit" id="saveActivitySubmitBtn" class="btn btn-primary">
+            <span>💾</span> Save Activity
+          </button>
+        </div>
+      </form>
+
+    </div>
+  </div>
+
+  <!-- Site Footer -->
   <footer class="site-footer">
     <div class="container">
       <p>&copy; 2026 GlobalTrotter Travel Planner • Hackathon Prototype</p>
     </div>
   </footer>
 
+  <!-- Scripts -->
   <script src="js/storage.js"></script>
   <script src="js/app.js"></script>
   <script src="js/itinerary.js"></script>

@@ -1,9 +1,9 @@
 /**
- * GlobalTrotter - Smart Stop Suggestions (Frontend Phase 1)
+ * GlobalTrotter - Smart Stop Suggestions (Frontend Phase 1 & 3)
  * Handles route selection, smart stop lookups via mock data, dynamic card rendering,
- * and client-side Add to Trip interaction.
+ * and saving full trip data to storage.
  *
- * NOTE: Strictly no fake users or backend calls in this frontend-only prototype.
+ * NOTE: Strictly no fake users or backend calls in this frontend prototype.
  */
 
 // ==========================================================================
@@ -100,9 +100,14 @@ const MOCK_SMART_STOPS = [
 // DOM ELEMENTS & INITIALIZATION
 // ==========================================================================
 document.addEventListener('DOMContentLoaded', () => {
+  const tripTitleInput = document.getElementById('tripTitle');
   const fromCitySelect = document.getElementById('fromCity');
   const toCitySelect = document.getElementById('toCity');
+  const startDateInput = document.getElementById('startDate');
+  const endDateInput = document.getElementById('endDate');
+  const tripBudgetInput = document.getElementById('tripBudget');
   const findStopsBtn = document.getElementById('findStopsBtn');
+  const saveTripBtn = document.getElementById('saveTripBtn');
   const suggestionsContainer = document.getElementById('suggestionsContainer');
   const smartStopsSection = document.getElementById('smartStopsSection');
   const alertContainer = document.getElementById('alertContainer');
@@ -112,12 +117,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const timelineEmpty = document.getElementById('timelineEmpty');
   const activeRouteBadge = document.getElementById('activeRouteBadge');
 
-  // Load any previously selected trip from sessionStorage
+  // Load any previously active trip from sessionStorage
   initActiveTrip();
 
   // Event Listeners
   if (findStopsBtn) {
     findStopsBtn.addEventListener('click', handleFindStops);
+  }
+
+  if (saveTripBtn) {
+    saveTripBtn.addEventListener('click', handleSaveTrip);
   }
 
   // Auto-search on select change if both are filled
@@ -138,7 +147,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Quick route chips
   const routeChips = document.querySelectorAll('.route-chip');
   routeChips.forEach(chip => {
-    chip.addEventListener('click', (e) => {
+    chip.addEventListener('click', () => {
       const from = chip.getAttribute('data-from');
       const to = chip.getAttribute('data-to');
       if (from && to && fromCitySelect && toCitySelect) {
@@ -154,12 +163,17 @@ document.addEventListener('DOMContentLoaded', () => {
   // ==========================================================================
 
   /**
-   * Initializes trip timeline with existing session data
+   * Initializes trip inputs with existing session data
    */
   function initActiveTrip() {
     const trip = Storage.getActiveTrip();
+    if (trip.title && tripTitleInput) tripTitleInput.value = trip.title;
     if (trip.fromCity && fromCitySelect) fromCitySelect.value = trip.fromCity;
     if (trip.toCity && toCitySelect) toCitySelect.value = trip.toCity;
+    if (trip.startDate && startDateInput) startDateInput.value = trip.startDate;
+    if (trip.endDate && endDateInput) endDateInput.value = trip.endDate;
+    if (trip.budget && tripBudgetInput) tripBudgetInput.value = trip.budget;
+
     updateTimelineUI();
 
     // If both cities are already stored, trigger search automatically
@@ -191,7 +205,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const fromCity = fromCitySelect ? fromCitySelect.value.trim() : '';
     const toCity = toCitySelect ? toCitySelect.value.trim() : '';
 
-    // Clear previous alerts
     clearAlert();
 
     // Validation
@@ -205,8 +218,8 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // Save route to storage
-    Storage.setRoute(fromCity, toCity);
+    // Save route and metadata to storage
+    syncFormDataToStorage();
     updateTimelineUI();
 
     // Show Smart Stops Section
@@ -226,6 +239,62 @@ document.addEventListener('DOMContentLoaded', () => {
       const stops = findMatchingStops(fromCity, toCity);
       renderSuggestions(stops, fromCity, toCity);
     }, 300);
+  }
+
+  /**
+   * Synchronizes form input fields into the active trip in storage
+   */
+  function syncFormDataToStorage() {
+    const trip = Storage.getActiveTrip();
+    const fromCity = fromCitySelect ? fromCitySelect.value.trim() : '';
+    const toCity = toCitySelect ? toCitySelect.value.trim() : '';
+    const title = tripTitleInput && tripTitleInput.value.trim() ? tripTitleInput.value.trim() : `Trip from ${fromCity} to ${toCity}`;
+    const startDate = startDateInput ? startDateInput.value : '';
+    const endDate = endDateInput ? endDateInput.value : '';
+    const budget = tripBudgetInput ? tripBudgetInput.value : '';
+
+    // Calculate duration
+    let duration = 'Flexible';
+    if (startDate && endDate) {
+      const d1 = new Date(startDate);
+      const d2 = new Date(endDate);
+      const diffTime = d2 - d1;
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+      if (diffDays > 0) {
+        duration = `${diffDays} ${diffDays === 1 ? 'day' : 'days'}`;
+      }
+    }
+
+    trip.title = title;
+    trip.destination = toCity;
+    trip.fromCity = fromCity;
+    trip.toCity = toCity;
+    trip.startDate = startDate;
+    trip.endDate = endDate;
+    trip.budget = budget;
+    trip.duration = duration;
+
+    Storage.saveActiveTrip(trip);
+    return trip;
+  }
+
+  /**
+   * Save trip button handler (saves to permanent list and navigates to itinerary.html)
+   */
+  function handleSaveTrip() {
+    const fromCity = fromCitySelect ? fromCitySelect.value.trim() : '';
+    const toCity = toCitySelect ? toCitySelect.value.trim() : '';
+
+    if (!fromCity || !toCity) {
+      showAlert('Please choose both From and To cities before saving your trip.', 'warning');
+      return;
+    }
+
+    const tripData = syncFormDataToStorage();
+    const saved = Storage.saveTrip(tripData);
+
+    // Redirect to trip itinerary details page
+    window.location.href = `itinerary.html?id=${encodeURIComponent(saved.id)}`;
   }
 
   /**
@@ -418,7 +487,7 @@ document.addEventListener('DOMContentLoaded', () => {
    */
   function escapeHtml(str) {
     if (!str) return '';
-    return str.replace(/[&<>"']/g, match => ({
+    return String(str).replace(/[&<>"']/g, match => ({
       '&': '&amp;',
       '<': '&lt;',
       '>': '&gt;',
