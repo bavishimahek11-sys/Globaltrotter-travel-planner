@@ -1,48 +1,8 @@
 /**
- * GlobalTrotter - Trip Details, Itinerary, Budget, Map & Collaboration JS (Phases 3, 4, 5 & 6)
+ * GlobalTrotter - Trip Details, Itinerary, Budget, Map & Collaboration JS (Phase 7 Clean Architecture)
+ * Fully data-driven from backend API endpoints with clean loading, empty, and error states.
  *
- * Manages rendering of dynamic trip details, grouped day-by-day activities,
- * activity creation/editing/deletion, dynamic budget calculations, expense tracking,
- * visual progress indicators, interactive Leaflet map, trip sharing, and collaborator management.
- *
- * NOTE: Strictly no fake users, no fake trips, no fake collaborators, and no hardcoded fake share URLs.
- *
- * ============================================================================
- * EXPECTED BACKEND REST API SPECIFICATION (For Future Backend Integration)
- * ============================================================================
- * 
- * 1. Get Trip Details with Itinerary, Coordinates, Expenses & Collaborators:
- *    GET /api/trips/:id
- *    Response: {
- *      id: "trip_123",
- *      title: "Mumbai Coastal Getaway",
- *      destination: "Mumbai",
- *      fromCity: "Ahmedabad",
- *      toCity: "Mumbai",
- *      startDate: "2026-09-10",
- *      endDate: "2026-09-14",
- *      budget: 20000,
- *      duration: "5 days",
- *      shareUrl: "https://globaltrotter.app/shared-trip.html?id=trip_123",
- *      currentUserRole: "Owner", // "Owner" | "Editor" | "Viewer"
- *      collaborators: [
- *        { id: "collab_1", name: "Rahul Sharma", email: "rahul@example.com", role: "Editor" },
- *        { id: "collab_2", name: "Priya Patel", email: "priya@example.com", role: "Viewer" }
- *      ],
- *      itinerary: [
- *        { id: "act_1", date: "2026-09-10", time: "09:00", activity: "Laxmi Vilas Palace", location: "Vadodara", latitude: 22.2937, longitude: 73.1915, notes: "Audio guide" }
- *      ],
- *      expenses: [
- *        { id: "exp_1", title: "Train Tickets", category: "Transport", amount: 2500, date: "2026-09-10", notes: "Express coach" }
- *      ]
- *    }
- *
- * 2. Collaborator & Sharing Endpoints (Phase 6):
- *    GET /api/trips/:id/collaborators -> List collaborators
- *    POST /api/trips/:id/collaborators/invite -> Invite companion (Body: { email, name, role })
- *    DELETE /api/trips/:id/collaborators/:collaboratorId -> Remove collaborator
- *    POST /api/trips/:id/share-link -> Generate shareable token/link
- * ============================================================================
+ * NOTE: Strictly no fake users, fake trips, fake expenses, or localStorage database logic.
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -58,7 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const pageAlertContainer = document.getElementById('pageAlertContainer');
   const readOnlyBanner = document.getElementById('readOnlyBanner');
 
-  // Map Elements (Phase 5)
+  // Map Elements
   const tripMapEl = document.getElementById('tripMap');
   const mapEmptyState = document.getElementById('mapEmptyState');
   const mapPointsBadge = document.getElementById('mapPointsBadge');
@@ -100,7 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const expenseNotesInput = document.getElementById('expenseNotes');
   const saveExpenseSubmitBtn = document.getElementById('saveExpenseSubmitBtn');
 
-  // Share Modal Elements (Phase 6)
+  // Share Modal Elements
   const shareModal = document.getElementById('shareModal');
   const closeShareModalBtn = document.getElementById('closeShareModalBtn');
   const cancelShareModalBtn = document.getElementById('cancelShareModalBtn');
@@ -109,7 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const copyShareLinkBtn = document.getElementById('copyShareLinkBtn');
   const shareCopyFeedback = document.getElementById('shareCopyFeedback');
 
-  // Invite Collaborator Modal Elements (Phase 6)
+  // Invite Collaborator Modal Elements
   const inviteModal = document.getElementById('inviteModal');
   const openInviteModalBtn = document.getElementById('openInviteModalBtn');
   const closeInviteModalBtn = document.getElementById('closeInviteModalBtn');
@@ -121,51 +81,108 @@ document.addEventListener('DOMContentLoaded', () => {
   const inviteRoleInput = document.getElementById('inviteRole');
   const sendInviteSubmitBtn = document.getElementById('sendInviteSubmitBtn');
 
-  // Target Trip & Role
+  // Target Trip & State
   const urlParams = new URLSearchParams(window.location.search);
-  const tripId = urlParams.get('id') || 'active';
+  const tripId = urlParams.get('id');
   const requestedRole = urlParams.get('role'); // e.g. 'viewer'
-  let currentTrip = Storage.getTripById(tripId);
-  const isViewerMode = requestedRole === 'viewer' || (currentTrip && currentTrip.currentUserRole === 'Viewer');
+  let currentTrip = null;
+  let isViewerMode = requestedRole === 'viewer';
 
-  // Initialize Page
-  renderTripDetails();
+  // Initialize
   initTripMap();
-  renderItinerary();
-  renderBudgetAndExpenses();
-  renderTripMap();
-  renderCollaborators();
-  applyRolePermissions();
   setupEventListeners();
+  loadTripData();
 
   // ==========================================================================
-  // 1. RENDER TRIP DETAILS SUMMARY
+  // 1. DATA LOADING & STATE MANAGEMENT
   // ==========================================================================
-  function renderTripDetails() {
-    if (!tripSummaryCard) return;
-
-    if (!currentTrip || (!currentTrip.fromCity && !currentTrip.toCity && !currentTrip.title)) {
-      tripSummaryCard.innerHTML = `
-        <div class="state-box" style="padding: 2rem;">
-          <span class="state-icon">🎒</span>
-          <div class="state-title">No Trip Selected</div>
-          <div class="state-desc">You haven't configured a trip yet. Create a new trip or choose one from your saved trips.</div>
-          <div style="margin-top: 1.25rem;">
-            <a href="create-trip.html" class="btn btn-primary">Plan a Trip</a>
-          </div>
-        </div>
-      `;
-      if (openAddActivityBtn) openAddActivityBtn.style.display = 'none';
-      if (openAddExpenseBtn) openAddExpenseBtn.style.display = 'none';
-      if (openInviteModalBtn) openInviteModalBtn.style.display = 'none';
+  async function loadTripData() {
+    if (!tripId) {
+      renderNoTripState();
       return;
     }
 
-    if (!isViewerMode) {
-      if (openAddActivityBtn) openAddActivityBtn.style.display = 'inline-flex';
-      if (openAddExpenseBtn) openAddExpenseBtn.style.display = 'inline-flex';
-      if (openInviteModalBtn) openInviteModalBtn.style.display = 'inline-flex';
+    showGlobalLoading();
+
+    try {
+      currentTrip = await API.getTripById(tripId);
+      if (!currentTrip) {
+        renderNoTripState();
+        return;
+      }
+
+      isViewerMode = requestedRole === 'viewer' || (currentTrip.currentUserRole === 'Viewer');
+
+      renderTripDetails();
+      renderItinerary();
+      renderBudgetAndExpenses();
+      renderTripMap();
+      renderCollaborators();
+      applyRolePermissions();
+    } catch (err) {
+      console.warn('Trip loading notice:', err.message);
+      renderErrorState();
     }
+  }
+
+  function showGlobalLoading() {
+    if (tripSummaryCard) {
+      tripSummaryCard.innerHTML = `
+        <div class="state-box" style="padding: 3rem 2rem;">
+          <div class="spinner"></div>
+          <div class="state-title">Loading Trip Details...</div>
+          <div class="state-desc">Fetching real-time trip information, activities, budget, and route.</div>
+        </div>
+      `;
+    }
+  }
+
+  function renderErrorState() {
+    if (tripSummaryCard) {
+      tripSummaryCard.innerHTML = `
+        <div class="state-box" style="padding: 3rem 2rem;">
+          <span class="state-icon">⚠️</span>
+          <div class="state-title">Unable to Load Trip Details</div>
+          <div class="state-desc">Could not connect to the backend server. Please verify your connection and try again.</div>
+          <div style="margin-top: 1.25rem;">
+            <button type="button" id="retryTripBtn" class="btn btn-primary btn-sm">
+              <span>🔄</span> Retry
+            </button>
+          </div>
+        </div>
+      `;
+
+      const retryBtn = document.getElementById('retryTripBtn');
+      if (retryBtn) {
+        retryBtn.addEventListener('click', loadTripData);
+      }
+    }
+  }
+
+  function renderNoTripState() {
+    if (tripSummaryCard) {
+      tripSummaryCard.innerHTML = `
+        <div class="state-box" style="padding: 2.5rem 1.5rem;">
+          <span class="state-icon">🎒</span>
+          <div class="state-title">No Trip Selected</div>
+          <div class="state-desc">Select a trip from your saved trips or plan a new trip to view the itinerary.</div>
+          <div style="margin-top: 1.25rem;">
+            <a href="create-trip.html" class="btn btn-primary btn-sm">Plan a Trip</a>
+          </div>
+        </div>
+      `;
+    }
+    if (openAddActivityBtn) openAddActivityBtn.style.display = 'none';
+    if (openAddExpenseBtn) openAddExpenseBtn.style.display = 'none';
+    if (openInviteModalBtn) openInviteModalBtn.style.display = 'none';
+    if (mapEmptyState) mapEmptyState.style.display = 'block';
+  }
+
+  // ==========================================================================
+  // 2. RENDER TRIP DETAILS SUMMARY
+  // ==========================================================================
+  function renderTripDetails() {
+    if (!tripSummaryCard || !currentTrip) return;
 
     const title = currentTrip.title || `Trip to ${currentTrip.toCity || currentTrip.destination || 'Destination'}`;
     const destination = currentTrip.destination || (currentTrip.fromCity && currentTrip.toCity ? `${currentTrip.fromCity} ➔ ${currentTrip.toCity}` : 'Custom Destination');
@@ -228,7 +245,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================================================
-  // 2. PHASE 5: INTERACTIVE MAP & ROUTE VISUALIZATION (LEAFLET.JS)
+  // 3. INTERACTIVE MAP & ROUTE VISUALIZATION (LEAFLET.JS)
   // ==========================================================================
   function initTripMap() {
     if (!tripMapEl || typeof L === 'undefined') return;
@@ -253,13 +270,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderTripMap() {
-    if (!leafletMap || !markersLayer) return;
+    if (!leafletMap || !markersLayer || !currentTrip) return;
 
     markersLayer.clearLayers();
     activityMarkersMap = {};
-
-    currentTrip = Storage.getTripById(tripId);
-    if (!currentTrip) return;
 
     const activities = currentTrip.itinerary || [];
     const validPoints = [];
@@ -351,17 +365,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================================================
-  // 3. RENDER ITINERARY ACTIVITIES
+  // 4. RENDER ITINERARY ACTIVITIES
   // ==========================================================================
   function renderItinerary() {
-    if (!itineraryDaysContainer) return;
-
-    currentTrip = Storage.getTripById(tripId);
-
-    if (!currentTrip || (!currentTrip.fromCity && !currentTrip.toCity && !currentTrip.title)) {
-      itineraryDaysContainer.innerHTML = '';
-      return;
-    }
+    if (!itineraryDaysContainer || !currentTrip) return;
 
     const activities = currentTrip.itinerary || [];
 
@@ -476,19 +483,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================================================
-  // 4. RENDER BUDGET TRACKING & EXPENSES
+  // 5. RENDER BUDGET TRACKING & EXPENSES
   // ==========================================================================
   function renderBudgetAndExpenses() {
-    if (!budgetSummaryBox || !expensesContainer) return;
-
-    currentTrip = Storage.getTripById(tripId);
-
-    if (!currentTrip || (!currentTrip.fromCity && !currentTrip.toCity && !currentTrip.title)) {
-      budgetSummaryBox.innerHTML = '';
-      expensesContainer.innerHTML = '';
-      if (categoryBreakdownCard) categoryBreakdownCard.style.display = 'none';
-      return;
-    }
+    if (!budgetSummaryBox || !expensesContainer || !currentTrip) return;
 
     const totalBudget = Number(currentTrip.budget) || 0;
     const expenses = currentTrip.expenses || [];
@@ -682,13 +680,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================================================
-  // 5. PHASE 6: RENDER COLLABORATORS
+  // 6. RENDER COLLABORATORS
   // ==========================================================================
   function renderCollaborators() {
-    if (!collaboratorsListContainer) return;
-
-    currentTrip = Storage.getTripById(tripId);
-    if (!currentTrip) return;
+    if (!collaboratorsListContainer || !currentTrip) return;
 
     const collaborators = currentTrip.collaborators || [];
 
@@ -754,25 +749,27 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  function handleRemoveCollaborator(collabId) {
+  async function handleRemoveCollaborator(collabId) {
     if (!currentTrip) return;
     const collab = (currentTrip.collaborators || []).find(c => String(c.id) === String(collabId));
     const name = collab ? (collab.name || collab.email) : 'this collaborator';
 
     if (window.confirm(`Are you sure you want to remove ${name} from this trip?`)) {
-      Storage.removeCollaborator(currentTrip.id, collabId);
-      showPageAlert('Collaborator removed.', 'warning');
-      renderCollaborators();
+      try {
+        await API.removeCollaborator(currentTrip.id, collabId);
+        showPageAlert('Collaborator removed.', 'warning');
+        loadTripData();
+      } catch (err) {
+        showPageAlert('Failed to remove collaborator. Please try again.', 'danger');
+      }
     }
   }
 
   // ==========================================================================
-  // 6. PHASE 6: SHARE TRIP & COPY LINK MODAL LOGIC
+  // 7. SHARE TRIP & COPY LINK MODAL LOGIC
   // ==========================================================================
   function openShareModal() {
-    if (!shareModal) return;
-    currentTrip = Storage.getTripById(tripId);
-    if (!currentTrip) return;
+    if (!shareModal || !currentTrip) return;
 
     if (shareCopyFeedback) shareCopyFeedback.innerHTML = '';
 
@@ -781,11 +778,10 @@ document.addEventListener('DOMContentLoaded', () => {
       shareModalTripInfo.textContent = `Trip: ${title}`;
     }
 
-    // Generate legitimate share link
     const origin = window.location.origin && window.location.origin !== 'null' ? window.location.origin : '';
     const pathname = window.location.pathname ? window.location.pathname.replace('itinerary.html', 'shared-trip.html') : 'shared-trip.html';
-    const targetId = currentTrip.id || 'active';
-    const fullShareUrl = origin ? `${origin}${pathname}?id=${encodeURIComponent(targetId)}` : `shared-trip.html?id=${encodeURIComponent(targetId)}`;
+    const targetId = currentTrip.id || '';
+    const fullShareUrl = currentTrip.shareUrl || (origin ? `${origin}${pathname}?id=${encodeURIComponent(targetId)}` : `shared-trip.html?id=${encodeURIComponent(targetId)}`);
 
     if (shareLinkInput) {
       shareLinkInput.value = fullShareUrl;
@@ -844,7 +840,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================================================
-  // 7. PHASE 6: INVITE COLLABORATOR MODAL LOGIC
+  // 8. INVITE COLLABORATOR MODAL LOGIC
   // ==========================================================================
   function openInviteModal() {
     if (!inviteModal || !inviteCollaboratorForm) return;
@@ -862,7 +858,7 @@ document.addEventListener('DOMContentLoaded', () => {
     clearInviteModalAlerts();
   }
 
-  function handleInviteFormSubmit(e) {
+  async function handleInviteFormSubmit(e) {
     e.preventDefault();
     clearInviteModalAlerts();
 
@@ -870,7 +866,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const name = inviteNameInput ? inviteNameInput.value.trim() : '';
     const role = inviteRoleInput ? inviteRoleInput.value.trim() : 'Viewer';
 
-    // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email || !emailRegex.test(email)) {
       showInviteModalAlert('Please enter a valid email address.');
@@ -878,17 +873,24 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const collaboratorData = { email, name, role };
-    const result = Storage.addCollaborator(currentTrip.id, collaboratorData);
-
-    if (result && result.error) {
-      showInviteModalAlert(result.error);
-      return;
+    if (sendInviteSubmitBtn) {
+      sendInviteSubmitBtn.disabled = true;
+      sendInviteSubmitBtn.innerHTML = '<span>⏳</span> Sending...';
     }
 
-    closeInviteModal();
-    showPageAlert(`Invitation sent to ${email} as ${role}!`, 'success');
-    renderCollaborators();
+    try {
+      await API.inviteCollaborator(currentTrip.id, { email, name, role });
+      closeInviteModal();
+      showPageAlert(`Invitation sent to ${email} as ${role}!`, 'success');
+      loadTripData();
+    } catch (err) {
+      showInviteModalAlert(err.message || 'Failed to send collaborator invitation.');
+    } finally {
+      if (sendInviteSubmitBtn) {
+        sendInviteSubmitBtn.disabled = false;
+        sendInviteSubmitBtn.innerHTML = '<span>📨</span> Send Invitation';
+      }
+    }
   }
 
   function applyRolePermissions() {
@@ -903,7 +905,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================================================
-  // 8. EVENT LISTENERS SETUP
+  // 9. EVENT LISTENERS SETUP
   // ==========================================================================
   function setupEventListeners() {
     // Activity Modal Listeners
@@ -936,7 +938,7 @@ document.addEventListener('DOMContentLoaded', () => {
       expenseForm.addEventListener('submit', handleExpenseFormSubmit);
     }
 
-    // Share Modal Listeners (Phase 6)
+    // Share Modal Listeners
     if (closeShareModalBtn) closeShareModalBtn.addEventListener('click', closeShareModal);
     if (cancelShareModalBtn) cancelShareModalBtn.addEventListener('click', closeShareModal);
     if (copyShareLinkBtn) copyShareLinkBtn.addEventListener('click', handleCopyShareLink);
@@ -947,7 +949,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
-    // Invite Modal Listeners (Phase 6)
+    // Invite Modal Listeners
     if (openInviteModalBtn) openInviteModalBtn.addEventListener('click', openInviteModal);
     if (closeInviteModalBtn) closeInviteModalBtn.addEventListener('click', closeInviteModal);
     if (cancelInviteModalBtn) cancelInviteModalBtn.addEventListener('click', closeInviteModal);
@@ -974,7 +976,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================================================
-  // 9. ACTIVITY & EXPENSE MODALS HELPERS
+  // 10. ACTIVITY & EXPENSE MODALS HELPERS
   // ==========================================================================
   function openAddModal() {
     if (!activityModal || !activityForm) return;
@@ -1029,7 +1031,7 @@ document.addEventListener('DOMContentLoaded', () => {
     clearModalAlerts();
   }
 
-  function handleActivityFormSubmit(e) {
+  async function handleActivityFormSubmit(e) {
     e.preventDefault();
     clearModalAlerts();
 
@@ -1085,29 +1087,45 @@ document.addEventListener('DOMContentLoaded', () => {
       longitude: lng !== null ? lng : undefined
     };
 
-    if (editingId) {
-      Storage.updateItineraryItem(currentTrip.id, editingId, activityData);
-      showPageAlert(`Activity "${name}" updated successfully!`, 'success');
-    } else {
-      Storage.addItineraryItem(currentTrip.id, activityData);
-      showPageAlert(`Activity "${name}" added to itinerary!`, 'success');
+    if (saveActivitySubmitBtn) {
+      saveActivitySubmitBtn.disabled = true;
+      saveActivitySubmitBtn.innerHTML = '<span>⏳</span> Saving...';
     }
 
-    closeModal();
-    renderItinerary();
-    renderTripMap();
+    try {
+      if (editingId) {
+        await API.updateItineraryItem(currentTrip.id, editingId, activityData);
+        showPageAlert(`Activity "${name}" updated successfully!`, 'success');
+      } else {
+        await API.addItineraryItem(currentTrip.id, activityData);
+        showPageAlert(`Activity "${name}" added to itinerary!`, 'success');
+      }
+
+      closeModal();
+      loadTripData();
+    } catch (err) {
+      showModalAlert(err.message || 'Failed to save activity. Please try again.');
+    } finally {
+      if (saveActivitySubmitBtn) {
+        saveActivitySubmitBtn.disabled = false;
+        saveActivitySubmitBtn.innerHTML = editingId ? '<span>💾</span> Update Activity' : '<span>💾</span> Save Activity';
+      }
+    }
   }
 
-  function handleDeleteActivity(activityId) {
+  async function handleDeleteActivity(activityId) {
     if (!currentTrip) return;
     const activity = (currentTrip.itinerary || []).find(i => String(i.id) === String(activityId));
     const activityName = activity ? `"${activity.activity}"` : 'this activity';
 
     if (window.confirm(`Are you sure you want to delete ${activityName} from your itinerary?`)) {
-      Storage.deleteItineraryItem(currentTrip.id, activityId);
-      showPageAlert('Activity deleted successfully.', 'warning');
-      renderItinerary();
-      renderTripMap();
+      try {
+        await API.deleteItineraryItem(currentTrip.id, activityId);
+        showPageAlert('Activity deleted successfully.', 'warning');
+        loadTripData();
+      } catch (err) {
+        showPageAlert('Failed to delete activity. Please try again.', 'danger');
+      }
     }
   }
 
@@ -1158,7 +1176,7 @@ document.addEventListener('DOMContentLoaded', () => {
     clearExpenseModalAlerts();
   }
 
-  function handleExpenseFormSubmit(e) {
+  async function handleExpenseFormSubmit(e) {
     e.preventDefault();
     clearExpenseModalAlerts();
 
@@ -1195,32 +1213,50 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const expenseData = { title, category, amount: amountVal, date, notes };
 
-    if (editingId) {
-      Storage.updateExpense(currentTrip.id, editingId, expenseData);
-      showPageAlert(`Expense "${title}" updated successfully!`, 'success');
-    } else {
-      Storage.addExpense(currentTrip.id, expenseData);
-      showPageAlert(`Expense "${title}" (₹${amountVal.toLocaleString()}) recorded!`, 'success');
+    if (saveExpenseSubmitBtn) {
+      saveExpenseSubmitBtn.disabled = true;
+      saveExpenseSubmitBtn.innerHTML = '<span>⏳</span> Saving...';
     }
 
-    closeExpenseModal();
-    renderBudgetAndExpenses();
+    try {
+      if (editingId) {
+        await API.updateExpense(currentTrip.id, editingId, expenseData);
+        showPageAlert(`Expense "${title}" updated successfully!`, 'success');
+      } else {
+        await API.addExpense(currentTrip.id, expenseData);
+        showPageAlert(`Expense "${title}" (₹${amountVal.toLocaleString()}) recorded!`, 'success');
+      }
+
+      closeExpenseModal();
+      loadTripData();
+    } catch (err) {
+      showExpenseModalAlert(err.message || 'Failed to save expense. Please try again.');
+    } finally {
+      if (saveExpenseSubmitBtn) {
+        saveExpenseSubmitBtn.disabled = false;
+        saveExpenseSubmitBtn.innerHTML = editingId ? '<span>💾</span> Update Expense' : '<span>💾</span> Save Expense';
+      }
+    }
   }
 
-  function handleDeleteExpense(expenseId) {
+  async function handleDeleteExpense(expenseId) {
     if (!currentTrip) return;
     const expense = (currentTrip.expenses || []).find(e => String(e.id) === String(expenseId));
     const expenseTitle = expense ? `"${expense.title}"` : 'this expense';
 
     if (window.confirm(`Are you sure you want to delete ${expenseTitle}?`)) {
-      Storage.deleteExpense(currentTrip.id, expenseId);
-      showPageAlert('Expense deleted successfully.', 'warning');
-      renderBudgetAndExpenses();
+      try {
+        await API.deleteExpense(currentTrip.id, expenseId);
+        showPageAlert('Expense deleted successfully.', 'warning');
+        loadTripData();
+      } catch (err) {
+        showPageAlert('Failed to delete expense. Please try again.', 'danger');
+      }
     }
   }
 
   // ==========================================================================
-  // 10. GENERAL HELPERS
+  // 11. GENERAL HELPERS
   // ==========================================================================
   function groupActivitiesByDate(activities) {
     const groups = {};

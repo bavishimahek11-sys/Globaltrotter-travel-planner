@@ -1,24 +1,63 @@
 /**
- * GlobalTrotter - My Trips Dashboard JS
- * Loads and displays user-created trips from storage.
- * Strictly no fake users or hardcoded fake trips.
+ * GlobalTrotter - My Trips Dashboard JS (Phase 7 Final Clean Architecture)
+ * Fetches and displays trips from backend API with clean loading, empty, and error states.
+ *
+ * NOTE: Strictly no fake trips and no localStorage database logic.
  */
 
 document.addEventListener('DOMContentLoaded', () => {
   const container = document.getElementById('tripsContainer');
   if (!container) return;
 
-  renderTrips();
+  loadTrips();
 
-  function renderTrips() {
-    const trips = Storage.getTrips();
+  async function loadTrips() {
+    showLoading();
 
-    if (!trips || trips.length === 0) {
+    try {
+      const trips = await API.getTrips();
+      renderTrips(trips);
+    } catch (err) {
+      console.warn('Trips load notice:', err.message);
+      showError();
+    }
+  }
+
+  function showLoading() {
+    container.innerHTML = `
+      <div class="card" style="max-width: 700px; margin: 0 auto; text-align: center; padding: 3.5rem 2rem;">
+        <div class="spinner"></div>
+        <div class="state-title">Loading Trips...</div>
+        <div class="state-desc">Fetching your saved travel plans from the database.</div>
+      </div>
+    `;
+  }
+
+  function showError() {
+    container.innerHTML = `
+      <div class="card" style="max-width: 700px; margin: 0 auto; text-align: center; padding: 3.5rem 2rem;">
+        <span class="state-icon">⚠️</span>
+        <h2 style="font-size: 1.35rem; margin-bottom: 0.5rem;">Unable to Load Trips</h2>
+        <p style="color: var(--text-muted); margin-bottom: 1.5rem;">Could not connect to the backend server. Please verify your connection and try again.</p>
+        <button type="button" id="retryTripsBtn" class="btn btn-primary">
+          <span>🔄</span> Retry
+        </button>
+      </div>
+    `;
+
+    const retryBtn = document.getElementById('retryTripsBtn');
+    if (retryBtn) {
+      retryBtn.addEventListener('click', loadTrips);
+    }
+  }
+
+  function renderTrips(trips) {
+    if (!trips || !Array.isArray(trips) || trips.length === 0) {
       container.innerHTML = `
         <div class="card" style="max-width: 700px; margin: 0 auto; text-align: center; padding: 3.5rem 2rem;">
           <span class="state-icon">🎒</span>
-          <h2 style="font-size: 1.35rem; margin-bottom: 0.5rem;">No Saved Trips Yet</h2>
-          <p style="color: var(--text-muted); margin-bottom: 1.5rem;">Plan your first trip with smart stop suggestions and build your personalized itinerary.</p>
+          <h2 style="font-size: 1.35rem; margin-bottom: 0.5rem;">No trips yet. Create your first trip.</h2>
+          <p style="color: var(--text-muted); margin-bottom: 1.5rem;">Plan your first journey with smart stop suggestions and build your personalized itinerary.</p>
           <a href="create-trip.html" class="btn btn-primary">
             <span>✨</span> Create a Trip
           </a>
@@ -34,8 +73,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const card = document.createElement('div');
       card.className = 'trip-card';
 
-      const activityCount = trip.itinerary ? trip.itinerary.length : 0;
-      const stopsCount = trip.addedStops ? trip.addedStops.length : 0;
+      const activityCount = trip.itinerary && Array.isArray(trip.itinerary) ? trip.itinerary.length : 0;
+      const stopsCount = trip.addedStops && Array.isArray(trip.addedStops) ? trip.addedStops.length : 0;
       const dateRange = (trip.startDate && trip.endDate) 
         ? `${formatDate(trip.startDate)} – ${formatDate(trip.endDate)}` 
         : (trip.startDate ? formatDate(trip.startDate) : 'Dates flexible');
@@ -69,11 +108,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Handle Delete Trip
       const deleteBtn = card.querySelector('.btn-delete-trip');
-      deleteBtn.addEventListener('click', (e) => {
+      deleteBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
         if (confirm(`Are you sure you want to delete "${trip.title || 'this trip'}"?`)) {
-          Storage.deleteTrip(trip.id);
-          renderTrips();
+          try {
+            await API.deleteTrip(trip.id);
+            loadTrips();
+          } catch (err) {
+            alert('Failed to delete trip. Please try again.');
+          }
         }
       });
 

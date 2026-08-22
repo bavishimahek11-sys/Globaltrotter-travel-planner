@@ -1,104 +1,10 @@
 /**
- * GlobalTrotter - Smart Stop Suggestions (Frontend Phase 1 & 3)
- * Handles route selection, smart stop lookups via mock data, dynamic card rendering,
- * and saving full trip data to storage.
+ * GlobalTrotter - Create Trip & Smart Stop Suggestions JS (Phase 7 Final Clean Architecture)
+ * Communicates with backend REST API for route stops lookups and trip creation.
  *
- * NOTE: Strictly no fake users or backend calls in this frontend prototype.
+ * NOTE: Strictly no fake data arrays, no fake users, and no localStorage database usage.
  */
 
-// ==========================================================================
-// ISOLATED MOCK DATA FOR UI PROTOTYPING
-// ==========================================================================
-const MOCK_SMART_STOPS = [
-  {
-    from: "Ahmedabad",
-    to: "Mumbai",
-    stops: [
-      {
-        city: "Vadodara",
-        category: "Heritage • Food",
-        duration: "4–6 hours",
-        description: "Marvel at the majestic Laxmi Vilas Palace and savor authentic Gujarati thali and street savories along the expressway."
-      },
-      {
-        city: "Champaner",
-        category: "History • Culture",
-        duration: "3–5 hours",
-        description: "Explore UNESCO World Heritage Pavagadh-Champaner archaeological park with ancient mosques and hill fortress views."
-      },
-      {
-        city: "Surat",
-        category: "Culinary • Textiles",
-        duration: "3–4 hours",
-        description: "Known for world-famous diamonds, rich silk textiles, and incredible culinary delights like Locho and Ghari."
-      }
-    ]
-  },
-  {
-    from: "Delhi",
-    to: "Jaipur",
-    stops: [
-      {
-        city: "Neemrana",
-        category: "Fort • Heritage",
-        duration: "2–4 hours",
-        description: "Visit the 15th-century Neemrana Fort-Palace on the Delhi-Jaipur highway featuring stepwells and vintage charm."
-      },
-      {
-        city: "Murthal",
-        category: "Food • Highway Culture",
-        duration: "1–2 hours",
-        description: "Famous roadside culinary hub legendary for hot tandoori paranthas with fresh white butter."
-      }
-    ]
-  },
-  {
-    from: "Mumbai",
-    to: "Goa",
-    stops: [
-      {
-        city: "Kolhapur",
-        category: "Temples • Cuisine",
-        duration: "3–4 hours",
-        description: "Historic city renowned for the historic Mahalaxmi Temple, traditional leather footwear, and spicy Kolhapuri cuisine."
-      },
-      {
-        city: "Ratnagiri",
-        category: "Coastal • Nature",
-        duration: "4–5 hours",
-        description: "Scenic Konkan coastal town with Alphonso mango orchards, Jaigad lighthouse, and pristine beaches."
-      },
-      {
-        city: "Lonavala",
-        category: "Hill Station • Nature",
-        duration: "2–3 hours",
-        description: "Iconic Western Ghats getaway with scenic viewpoints, lush waterfalls, and traditional chikki snacks."
-      }
-    ]
-  },
-  {
-    from: "Bangalore",
-    to: "Chennai",
-    stops: [
-      {
-        city: "Vellore",
-        category: "Fort • Architecture",
-        duration: "2–3 hours",
-        description: "Home to the massive 16th-century granite Vellore Fort, Golden Temple (Sripuram), and rich Chola-Vijayanagar history."
-      },
-      {
-        city: "Kanchipuram",
-        category: "Silk • Temples",
-        duration: "3–4 hours",
-        description: "The City of Thousand Temples celebrated worldwide for magnificent temple architecture and handwoven silk sarees."
-      }
-    ]
-  }
-];
-
-// ==========================================================================
-// DOM ELEMENTS & INITIALIZATION
-// ==========================================================================
 document.addEventListener('DOMContentLoaded', () => {
   const tripTitleInput = document.getElementById('tripTitle');
   const fromCitySelect = document.getElementById('fromCity');
@@ -117,8 +23,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const timelineEmpty = document.getElementById('timelineEmpty');
   const activeRouteBadge = document.getElementById('activeRouteBadge');
 
-  // Load any previously active trip from sessionStorage
-  initActiveTrip();
+  // In-memory active state for current trip creation session
+  let selectedStops = [];
 
   // Event Listeners
   if (findStopsBtn) {
@@ -129,18 +35,13 @@ document.addEventListener('DOMContentLoaded', () => {
     saveTripBtn.addEventListener('click', handleSaveTrip);
   }
 
-  // Auto-search on select change if both are filled
   if (fromCitySelect && toCitySelect) {
     fromCitySelect.addEventListener('change', () => {
-      if (fromCitySelect.value && toCitySelect.value) {
-        handleFindStops();
-      }
+      updateTimelineUI();
     });
 
     toCitySelect.addEventListener('change', () => {
-      if (fromCitySelect.value && toCitySelect.value) {
-        handleFindStops();
-      }
+      updateTimelineUI();
     });
   }
 
@@ -163,45 +64,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // ==========================================================================
 
   /**
-   * Initializes trip inputs with existing session data
+   * Main search handler - calls backend API
    */
-  function initActiveTrip() {
-    const trip = Storage.getActiveTrip();
-    if (trip.title && tripTitleInput) tripTitleInput.value = trip.title;
-    if (trip.fromCity && fromCitySelect) fromCitySelect.value = trip.fromCity;
-    if (trip.toCity && toCitySelect) toCitySelect.value = trip.toCity;
-    if (trip.startDate && startDateInput) startDateInput.value = trip.startDate;
-    if (trip.endDate && endDateInput) endDateInput.value = trip.endDate;
-    if (trip.budget && tripBudgetInput) tripBudgetInput.value = trip.budget;
-
-    updateTimelineUI();
-
-    // If both cities are already stored, trigger search automatically
-    if (trip.fromCity && trip.toCity) {
-      handleFindStops();
-    }
-  }
-
-  /**
-   * Finds matching stops from mock data
-   */
-  function findMatchingStops(fromCity, toCity) {
-    const from = fromCity.trim().toLowerCase();
-    const to = toCity.trim().toLowerCase();
-
-    // Check direct route or reverse route
-    const route = MOCK_SMART_STOPS.find(r => 
-      (r.from.toLowerCase() === from && r.to.toLowerCase() === to) ||
-      (r.from.toLowerCase() === to && r.to.toLowerCase() === from)
-    );
-
-    return route ? route.stops : [];
-  }
-
-  /**
-   * Main search handler
-   */
-  function handleFindStops() {
+  async function handleFindStops() {
     const fromCity = fromCitySelect ? fromCitySelect.value.trim() : '';
     const toCity = toCitySelect ? toCitySelect.value.trim() : '';
 
@@ -218,11 +83,8 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // Save route and metadata to storage
-    syncFormDataToStorage();
     updateTimelineUI();
 
-    // Show Smart Stops Section
     if (smartStopsSection) {
       smartStopsSection.style.display = 'block';
     }
@@ -234,26 +96,32 @@ document.addEventListener('DOMContentLoaded', () => {
     // Show Loading State
     showLoadingState(fromCity, toCity);
 
-    // Simulate natural response transition (300ms)
-    setTimeout(() => {
-      const stops = findMatchingStops(fromCity, toCity);
+    try {
+      // Call real backend API
+      const stops = await API.getSmartStops(fromCity, toCity);
       renderSuggestions(stops, fromCity, toCity);
-    }, 300);
+    } catch (err) {
+      console.warn('Smart stops lookup notice:', err.message);
+      renderErrorState(fromCity, toCity);
+    }
   }
 
   /**
-   * Synchronizes form input fields into the active trip in storage
+   * Save trip button handler - sends real payload to backend API
    */
-  function syncFormDataToStorage() {
-    const trip = Storage.getActiveTrip();
+  async function handleSaveTrip() {
     const fromCity = fromCitySelect ? fromCitySelect.value.trim() : '';
     const toCity = toCitySelect ? toCitySelect.value.trim() : '';
     const title = tripTitleInput && tripTitleInput.value.trim() ? tripTitleInput.value.trim() : `Trip from ${fromCity} to ${toCity}`;
     const startDate = startDateInput ? startDateInput.value : '';
     const endDate = endDateInput ? endDateInput.value : '';
-    const budget = tripBudgetInput ? tripBudgetInput.value : '';
+    const budgetVal = tripBudgetInput && tripBudgetInput.value ? parseFloat(tripBudgetInput.value) : null;
 
-    // Calculate duration
+    if (!fromCity || !toCity) {
+      showAlert('Please choose both From and To cities before saving your trip.', 'warning');
+      return;
+    }
+
     let duration = 'Flexible';
     if (startDate && endDate) {
       const d1 = new Date(startDate);
@@ -265,36 +133,38 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    trip.title = title;
-    trip.destination = toCity;
-    trip.fromCity = fromCity;
-    trip.toCity = toCity;
-    trip.startDate = startDate;
-    trip.endDate = endDate;
-    trip.budget = budget;
-    trip.duration = duration;
+    const payload = {
+      title,
+      destination: toCity,
+      fromCity,
+      toCity,
+      startDate,
+      endDate,
+      budget: budgetVal,
+      duration,
+      addedStops: selectedStops
+    };
 
-    Storage.saveActiveTrip(trip);
-    return trip;
-  }
-
-  /**
-   * Save trip button handler (saves to permanent list and navigates to itinerary.html)
-   */
-  function handleSaveTrip() {
-    const fromCity = fromCitySelect ? fromCitySelect.value.trim() : '';
-    const toCity = toCitySelect ? toCitySelect.value.trim() : '';
-
-    if (!fromCity || !toCity) {
-      showAlert('Please choose both From and To cities before saving your trip.', 'warning');
-      return;
+    if (saveTripBtn) {
+      saveTripBtn.disabled = true;
+      saveTripBtn.innerHTML = '<span>⏳</span> Saving Trip...';
     }
 
-    const tripData = syncFormDataToStorage();
-    const saved = Storage.saveTrip(tripData);
-
-    // Redirect to trip itinerary details page
-    window.location.href = `itinerary.html?id=${encodeURIComponent(saved.id)}`;
+    try {
+      const createdTrip = await API.createTrip(payload);
+      const targetId = createdTrip && createdTrip.id ? createdTrip.id : '';
+      if (targetId) {
+        window.location.href = `itinerary.html?id=${encodeURIComponent(targetId)}`;
+      } else {
+        window.location.href = 'trips.html';
+      }
+    } catch (err) {
+      showAlert('Unable to save trip to the backend. Please verify your connection and try again.', 'danger');
+      if (saveTripBtn) {
+        saveTripBtn.disabled = false;
+        saveTripBtn.innerHTML = '<span>💾</span> Save Trip & View Itinerary';
+      }
+    }
   }
 
   /**
@@ -306,9 +176,33 @@ document.addEventListener('DOMContentLoaded', () => {
       <div class="state-box">
         <div class="spinner"></div>
         <div class="state-title">Finding Smart Stops...</div>
-        <div class="state-desc">Discovering interesting intermediate destinations between <strong>${escapeHtml(from)}</strong> and <strong>${escapeHtml(to)}</strong></div>
+        <div class="state-desc">Discovering intermediate destinations between <strong>${escapeHtml(from)}</strong> and <strong>${escapeHtml(to)}</strong></div>
       </div>
     `;
+  }
+
+  /**
+   * Displays API error state UI with retry button
+   */
+  function renderErrorState(from, to) {
+    if (!suggestionsContainer) return;
+    suggestionsContainer.innerHTML = `
+      <div class="state-box">
+        <span class="state-icon">⚠️</span>
+        <div class="state-title">Unable to load smart stop suggestions</div>
+        <div class="state-desc">Could not connect to the smart stops service for route <strong>${escapeHtml(from)} ➔ ${escapeHtml(to)}</strong>. Please check your backend connection.</div>
+        <div style="margin-top: 1rem;">
+          <button type="button" id="retryStopsBtn" class="btn btn-sm btn-outline">
+            <span>🔄</span> Retry Search
+          </button>
+        </div>
+      </div>
+    `;
+
+    const retryBtn = document.getElementById('retryStopsBtn');
+    if (retryBtn) {
+      retryBtn.addEventListener('click', handleFindStops);
+    }
   }
 
   /**
@@ -317,23 +211,22 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderSuggestions(stops, from, to) {
     if (!suggestionsContainer) return;
 
-    if (!stops || stops.length === 0) {
+    if (!stops || !Array.isArray(stops) || stops.length === 0) {
       suggestionsContainer.innerHTML = `
         <div class="state-box">
           <span class="state-icon">🗺️</span>
           <div class="state-title">No smart stops found for this route</div>
-          <div class="state-desc">We currently don't have curated intermediate stops between <strong>${escapeHtml(from)}</strong> and <strong>${escapeHtml(to)}</strong>. Try popular routes like <em>Ahmedabad ➔ Mumbai</em>, <em>Delhi ➔ Jaipur</em>, or <em>Mumbai ➔ Goa</em>.</div>
+          <div class="state-desc">No intermediate destinations were returned between <strong>${escapeHtml(from)}</strong> and <strong>${escapeHtml(to)}</strong>.</div>
         </div>
       `;
       return;
     }
 
-    // Create cards grid
     const grid = document.createElement('div');
     grid.className = 'suggestions-grid';
 
     stops.forEach((stop, index) => {
-      const isAdded = Storage.isStopAdded(stop.city);
+      const isAdded = selectedStops.some(s => s.city.toLowerCase() === stop.city.toLowerCase());
       const card = document.createElement('div');
       card.className = `stop-card ${isAdded ? 'is-selected' : ''}`;
       card.id = `stop-card-${index}`;
@@ -343,11 +236,13 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="stop-header">
             <h3 class="stop-title">📍 ${escapeHtml(stop.city)}</h3>
           </div>
-          <span class="stop-tag">${escapeHtml(stop.category)}</span>
-          <div class="stop-duration">
-            <span>⏱</span> Suggested stop: <strong>${escapeHtml(stop.duration)}</strong>
-          </div>
-          <p class="stop-desc">${escapeHtml(stop.description)}</p>
+          <span class="stop-tag">${escapeHtml(stop.category || 'Stop')}</span>
+          ${stop.duration ? `
+            <div class="stop-duration">
+              <span>⏱</span> Suggested stop: <strong>${escapeHtml(stop.duration)}</strong>
+            </div>
+          ` : ''}
+          <p class="stop-desc">${escapeHtml(stop.description || '')}</p>
         </div>
         <div class="stop-footer">
           <button type="button" class="btn btn-add ${isAdded ? 'is-added' : ''}" data-city="${escapeHtml(stop.city)}">
@@ -356,7 +251,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       `;
 
-      // Button interaction
       const btn = card.querySelector('.btn-add');
       btn.addEventListener('click', () => {
         handleToggleStop(stop, card, btn);
@@ -373,17 +267,15 @@ document.addEventListener('DOMContentLoaded', () => {
    * Handles Add to Trip / Remove toggle
    */
   function handleToggleStop(stop, card, btn) {
-    const isCurrentlyAdded = Storage.isStopAdded(stop.city);
+    const existsIndex = selectedStops.findIndex(s => s.city.toLowerCase() === stop.city.toLowerCase());
 
-    if (isCurrentlyAdded) {
-      // Remove stop
-      Storage.removeStop(stop.city);
+    if (existsIndex >= 0) {
+      selectedStops.splice(existsIndex, 1);
       btn.classList.remove('is-added');
       btn.textContent = '+ Add to Trip';
       card.classList.remove('is-selected');
     } else {
-      // Add stop
-      Storage.addStop(stop);
+      selectedStops.push(stop);
       btn.classList.add('is-added');
       btn.textContent = '✓ Added to Trip';
       card.classList.add('is-selected');
@@ -396,11 +288,12 @@ document.addEventListener('DOMContentLoaded', () => {
    * Updates the sidebar/bottom trip route timeline
    */
   function updateTimelineUI() {
-    const trip = Storage.getActiveTrip();
+    const fromCity = fromCitySelect ? fromCitySelect.value.trim() : '';
+    const toCity = toCitySelect ? toCitySelect.value.trim() : '';
 
     if (!timelineOrigin || !timelineDestination || !timelineStopsList) return;
 
-    if (!trip.fromCity && !trip.toCity && (!trip.addedStops || trip.addedStops.length === 0)) {
+    if (!fromCity && !toCity && selectedStops.length === 0) {
       if (timelineEmpty) timelineEmpty.style.display = 'block';
       if (timelineOrigin) timelineOrigin.style.display = 'none';
       if (timelineDestination) timelineDestination.style.display = 'none';
@@ -411,18 +304,18 @@ document.addEventListener('DOMContentLoaded', () => {
     if (timelineEmpty) timelineEmpty.style.display = 'none';
 
     // Origin
-    if (trip.fromCity) {
+    if (fromCity) {
       timelineOrigin.style.display = 'block';
       const nameEl = timelineOrigin.querySelector('.timeline-name');
-      if (nameEl) nameEl.textContent = trip.fromCity;
+      if (nameEl) nameEl.textContent = fromCity;
     } else {
       timelineOrigin.style.display = 'none';
     }
 
     // Intermediate stops
     timelineStopsList.innerHTML = '';
-    if (trip.addedStops && trip.addedStops.length > 0) {
-      trip.addedStops.forEach(stop => {
+    if (selectedStops.length > 0) {
+      selectedStops.forEach((stop, idx) => {
         const li = document.createElement('li');
         li.className = 'timeline-item';
         li.innerHTML = `
@@ -430,18 +323,16 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="timeline-content">
             <div>
               <div class="timeline-name">📍 ${escapeHtml(stop.city)}</div>
-              <div class="timeline-type">${escapeHtml(stop.category || 'Suggested Stop')} • ${escapeHtml(stop.duration || '')}</div>
+              <div class="timeline-type">${escapeHtml(stop.category || 'Stop')}${stop.duration ? ` • ${escapeHtml(stop.duration)}` : ''}</div>
             </div>
             <button type="button" class="btn-remove-stop" title="Remove stop" data-city="${escapeHtml(stop.city)}">✕</button>
           </div>
         `;
 
-        // Handle remove from timeline
         const removeBtn = li.querySelector('.btn-remove-stop');
         removeBtn.addEventListener('click', () => {
-          Storage.removeStop(stop.city);
+          selectedStops = selectedStops.filter(s => s.city.toLowerCase() !== stop.city.toLowerCase());
           updateTimelineUI();
-          // Update card button in suggestions grid if visible
           const activeBtn = document.querySelector(`.btn-add[data-city="${stop.city}"]`);
           if (activeBtn) {
             activeBtn.classList.remove('is-added');
@@ -456,18 +347,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Destination
-    if (trip.toCity) {
+    if (toCity) {
       timelineDestination.style.display = 'block';
       const nameEl = timelineDestination.querySelector('.timeline-name');
-      if (nameEl) nameEl.textContent = trip.toCity;
+      if (nameEl) nameEl.textContent = toCity;
     } else {
       timelineDestination.style.display = 'none';
     }
   }
 
-  /**
-   * Alert Helpers
-   */
   function showAlert(message, type = 'warning') {
     if (!alertContainer) return;
     alertContainer.innerHTML = `
@@ -482,9 +370,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (alertContainer) alertContainer.innerHTML = '';
   }
 
-  /**
-   * Simple HTML escaping helper to prevent XSS
-   */
   function escapeHtml(str) {
     if (!str) return '';
     return String(str).replace(/[&<>"']/g, match => ({
