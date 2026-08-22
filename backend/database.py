@@ -15,6 +15,7 @@ def get_db_connection():
 def init_db():
     conn = get_db_connection()
 
+    # Users table
     conn.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -25,6 +26,7 @@ def init_db():
         )
     """)
 
+    # Trips table
     conn.execute("""
         CREATE TABLE IF NOT EXISTS trips (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -39,6 +41,7 @@ def init_db():
         )
     """)
 
+    # Destinations table
     conn.execute("""
         CREATE TABLE IF NOT EXISTS destinations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -53,6 +56,7 @@ def init_db():
         )
     """)
 
+    # Itinerary table
     conn.execute("""
         CREATE TABLE IF NOT EXISTS itinerary (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -67,6 +71,21 @@ def init_db():
             ON DELETE CASCADE,
             FOREIGN KEY (destination_id) REFERENCES destinations(id)
             ON DELETE SET NULL
+        )
+    """)
+
+    # Expenses table
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS expenses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            trip_id INTEGER NOT NULL,
+            category TEXT NOT NULL,
+            description TEXT,
+            amount REAL NOT NULL,
+            expense_date TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (trip_id) REFERENCES trips(id)
+            ON DELETE CASCADE
         )
     """)
 
