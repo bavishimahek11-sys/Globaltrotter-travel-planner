@@ -4,6 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GlobalTrotter - Smart Travel Planner</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <!-- Stylesheets -->
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/responsive.css">
@@ -31,59 +35,236 @@
     </div>
   </header>
 
-  <!-- Hero Section -->
-  <section class="page-hero" style="padding: 4.5rem 0;">
+  <!-- Hero Section with Travel Background -->
+  <section class="home-hero">
     <div class="container">
-      <h1 style="font-size: 2.75rem; margin-bottom: 1rem;">Seamless Multi-City Travel Planning</h1>
+      <div class="hero-badge">
+        <span>✨</span> Intelligent Multi-City Travel Planner
+      </div>
+      <h1 style="color: #38BDF8;">Seamless Multi-City Travel Planning</h1>
       <p style="font-size: 1.2rem; margin-bottom: 2rem;">
         Discover hidden gems, get smart intermediate stop suggestions, and build the perfect travel itinerary in seconds.
       </p>
-      <div>
-        <a href="create-trip.html" class="btn btn-primary" style="font-size: 1.1rem; padding: 0.85rem 1.75rem;">
+      <div style="display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 2rem;">
+        <a href="create-trip.html" class="btn btn-primary" style="font-size: 1.05rem; padding: 0.85rem 1.75rem;">
           <span>✨</span> Try Smart Stop Suggestions
         </a>
+        <a href="trips.html" class="btn btn-outline" style="background: rgba(255, 255, 255, 0.1); color: #ffffff; border-color: rgba(255, 255, 255, 0.3); backdrop-filter: blur(8px); font-size: 1.05rem; padding: 0.85rem 1.75rem;">
+          <span>📋</span> View My Trips
+        </a>
+      </div>
+
+      <!-- Quick corridor suggestions -->
+      <div class="quick-routes" style="justify-content: center; margin-top: 1rem;">
+        <span class="quick-routes-label" style="color: #cbd5e1;">Popular Corridors:</span>
+        <a href="create-trip.html" class="route-chip" style="background: rgba(255, 255, 255, 0.12); color: #ffffff; border-color: rgba(255, 255, 255, 0.25);">Ahmedabad ➔ Mumbai</a>
+        <a href="create-trip.html" class="route-chip" style="background: rgba(255, 255, 255, 0.12); color: #ffffff; border-color: rgba(255, 255, 255, 0.25);">Delhi ➔ Jaipur</a>
+        <a href="create-trip.html" class="route-chip" style="background: rgba(255, 255, 255, 0.12); color: #ffffff; border-color: rgba(255, 255, 255, 0.25);">Mumbai ➔ Goa</a>
+        <a href="create-trip.html" class="route-chip" style="background: rgba(255, 255, 255, 0.12); color: #ffffff; border-color: rgba(255, 255, 255, 0.25);">Bangalore ➔ Chennai</a>
       </div>
     </div>
   </section>
 
-  <!-- Features Highlights -->
+  <!-- Main Content -->
   <main class="main-content">
     <div class="container">
-      <div style="text-align: center; margin-bottom: 2.5rem;">
-        <h2 style="font-size: 1.75rem; margin-bottom: 0.5rem;">Why GlobalTrotter?</h2>
-        <p style="color: var(--text-muted);">Smart tools designed for modern explorers</p>
+
+      <!-- Section 1: Popular & Trending Destinations -->
+      <div style="text-align: center; margin-bottom: 2.25rem;">
+        <h2 style="font-size: 2rem; margin-bottom: 0.5rem;">Popular & Trending Destinations</h2>
+        <p style="color: var(--text-muted); font-size: 1.05rem;">Explore curated cities and scenic stops across popular travel routes</p>
+      </div>
+
+      <div class="destinations-grid">
+        
+        <!-- Destination 1: Mumbai -->
+        <div class="destination-card">
+          <div class="destination-photo-wrapper">
+            <img src="https://images.unsplash.com/photo-1570168007204-dfb528c6958f?auto=format&fit=crop&w=800&q=80" alt="Mumbai City Skyline and Gateway" class="destination-photo" loading="lazy">
+            <span class="dest-badge">🌊 Coastal Metropolis</span>
+          </div>
+          <div class="dest-info">
+            <div>
+              <div class="dest-title-row">
+                <h3 class="dest-title">Mumbai</h3>
+                <span style="font-size: 0.8rem; color: var(--text-muted);">Maharashtra</span>
+              </div>
+              <p class="dest-tagline" style="margin: 0.5rem 0;">Iconic waterfronts, historic colonial architecture, vibrant street culture, and Arabian Sea promenades.</p>
+              <div class="dest-attractions">
+                <span class="dest-pill">📍 Gateway of India</span>
+                <span class="dest-pill">📍 Marine Drive</span>
+                <span class="dest-pill">📍 Elephanta Caves</span>
+              </div>
+            </div>
+            <div style="margin-top: 1rem;">
+              <a href="create-trip.html" class="btn btn-sm btn-outline" style="width: 100%;">Plan Trip to Mumbai ➔</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Destination 2: Goa -->
+        <div class="destination-card">
+          <div class="destination-photo-wrapper">
+            <img src="https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?auto=format&fit=crop&w=800&q=80" alt="Goa Sunset Beach" class="destination-photo" loading="lazy">
+            <span class="dest-badge">🏖️ Beach Paradise</span>
+          </div>
+          <div class="dest-info">
+            <div>
+              <div class="dest-title-row">
+                <h3 class="dest-title">Goa</h3>
+                <span style="font-size: 0.8rem; color: var(--text-muted);">West Coast</span>
+              </div>
+              <p class="dest-tagline" style="margin: 0.5rem 0;">Sun-kissed palm shores, Portuguese heritage villas, seafood delicacies, and relaxed coastal vibes.</p>
+              <div class="dest-attractions">
+                <span class="dest-pill">📍 Palolem Beach</span>
+                <span class="dest-pill">📍 Old Goa Churches</span>
+                <span class="dest-pill">📍 Fort Aguada</span>
+              </div>
+            </div>
+            <div style="margin-top: 1rem;">
+              <a href="create-trip.html" class="btn btn-sm btn-outline" style="width: 100%;">Plan Trip to Goa ➔</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Destination 3: Jaipur -->
+        <div class="destination-card">
+          <div class="destination-photo-wrapper">
+            <img src="assets/images/jaipur.jpg" onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/4/41/East_facade_Hawa_Mahal_Jaipur_from_ground_level_%28July_2022%29_-_img_01.jpg'" alt="Jaipur, Rajasthan" class="destination-photo" loading="lazy">
+            <span class="dest-badge">🏰 Royal Heritage</span>
+          </div>
+          <div class="dest-info">
+            <div>
+              <div class="dest-title-row">
+                <h3 class="dest-title">Jaipur</h3>
+                <span style="font-size: 0.8rem; color: var(--text-muted);">Rajasthan</span>
+              </div>
+              <p class="dest-tagline" style="margin: 0.5rem 0;">The famed Pink City featuring majestic Rajput forts, royal observatory, and colorful bazaar corridors.</p>
+              <div class="dest-attractions">
+                <span class="dest-pill">📍 Hawa Mahal</span>
+                <span class="dest-pill">📍 Amber Fort</span>
+                <span class="dest-pill">📍 City Palace</span>
+              </div>
+            </div>
+            <div style="margin-top: 1rem;">
+              <a href="create-trip.html" class="btn btn-sm btn-outline" style="width: 100%;">Plan Trip to Jaipur ➔</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Destination 4: Sabarmati Riverfront, Ahmedabad -->
+        <div class="destination-card">
+          <div class="destination-photo-wrapper">
+            <img src="assets/images/sabarmati_riverfront.jpg" onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/8/8a/Sabarmati_Riverfront_in_Ahmedabad.jpg'" alt="Sabarmati Riverfront, Ahmedabad" class="destination-photo" loading="lazy">
+            <span class="dest-badge">🏛️ UNESCO Heritage</span>
+          </div>
+          <div class="dest-info">
+            <div>
+              <div class="dest-title-row">
+                <h3 class="dest-title">Sabarmati Riverfront, Ahmedabad</h3>
+                <span style="font-size: 0.8rem; color: var(--text-muted);">Gujarat</span>
+              </div>
+              <p class="dest-tagline" style="margin: 0.5rem 0;">Historic walled city, tranquil Sabarmati Riverfront, intricate stepwells, and world-renowned textile markets.</p>
+              <div class="dest-attractions">
+                <span class="dest-pill">📍 Sabarmati Ashram</span>
+                <span class="dest-pill">📍 Adalaj Stepwell</span>
+                <span class="dest-pill">📍 Sidi Saiyyed</span>
+              </div>
+            </div>
+            <div style="margin-top: 1rem;">
+              <a href="create-trip.html" class="btn btn-sm btn-outline" style="width: 100%;">Plan Trip to Ahmedabad ➔</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Destination 5: Bangalore -->
+        <div class="destination-card">
+          <div class="destination-photo-wrapper">
+            <img src="https://images.unsplash.com/photo-1596176530529-78163a4f7af2?auto=format&fit=crop&w=800&q=80" alt="Bangalore Botanical Garden" class="destination-photo" loading="lazy">
+            <span class="dest-badge">🌿 Garden City</span>
+          </div>
+          <div class="dest-info">
+            <div>
+              <div class="dest-title-row">
+                <h3 class="dest-title">Bangalore</h3>
+                <span style="font-size: 0.8rem; color: var(--text-muted);">Karnataka</span>
+              </div>
+              <p class="dest-tagline" style="margin: 0.5rem 0;">Expansive botanical gardens, vibrant modern brew pubs, royal Bangalore Palace, and year-round pleasant climate.</p>
+              <div class="dest-attractions">
+                <span class="dest-pill">📍 Lalbagh Gardens</span>
+                <span class="dest-pill">📍 Cubbon Park</span>
+                <span class="dest-pill">📍 Bangalore Palace</span>
+              </div>
+            </div>
+            <div style="margin-top: 1rem;">
+              <a href="create-trip.html" class="btn btn-sm btn-outline" style="width: 100%;">Plan Trip to Bangalore ➔</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Destination 6: Delhi -->
+        <div class="destination-card">
+          <div class="destination-photo-wrapper">
+            <img src="https://images.unsplash.com/photo-1587474260584-136574528ed5?auto=format&fit=crop&w=800&q=80" alt="Delhi India Gate" class="destination-photo" loading="lazy">
+            <span class="dest-badge">👑 Capital Heritage</span>
+          </div>
+          <div class="dest-info">
+            <div>
+              <div class="dest-title-row">
+                <h3 class="dest-title">Delhi</h3>
+                <span style="font-size: 0.8rem; color: var(--text-muted);">National Capital</span>
+              </div>
+              <p class="dest-tagline" style="margin: 0.5rem 0;">Historic crossroads featuring Mughal architectural wonders, wide boulevards, vibrant markets, and culinary treasures.</p>
+              <div class="dest-attractions">
+                <span class="dest-pill">📍 India Gate</span>
+                <span class="dest-pill">📍 Qutub Minar</span>
+                <span class="dest-pill">📍 Red Fort</span>
+              </div>
+            </div>
+            <div style="margin-top: 1rem;">
+              <a href="create-trip.html" class="btn btn-sm btn-outline" style="width: 100%;">Plan Trip to Delhi ➔</a>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Section 2: Why GlobalTrotter Feature Highlights -->
+      <div style="text-align: center; margin-bottom: 2.25rem; margin-top: 1rem;">
+        <h2 style="font-size: 2rem; margin-bottom: 0.5rem;">Why GlobalTrotter?</h2>
+        <p style="color: var(--text-muted); font-size: 1.05rem;">Comprehensive tools designed for seamless multi-city exploration</p>
       </div>
 
       <div class="suggestions-grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
         
         <!-- Feature 1: Smart Stop Suggestions -->
-        <div class="card" style="text-align: center; padding: 2rem;">
-          <div style="font-size: 2.5rem; margin-bottom: 1rem;">✨</div>
-          <h3 style="font-size: 1.2rem; margin-bottom: 0.5rem;">Smart Stop Suggestions</h3>
-          <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem;">
-            Automatically discover curated intermediate destinations between any two cities on your route.
+        <div class="card" style="text-align: center; padding: 2.25rem 1.75rem;">
+          <div style="font-size: 2.75rem; margin-bottom: 1rem;">✨</div>
+          <h3 style="font-size: 1.25rem; margin-bottom: 0.5rem;">Smart Stop Suggestions</h3>
+          <p style="color: var(--text-muted); font-size: 0.925rem; margin-bottom: 1.5rem; line-height: 1.55;">
+            Automatically discover curated intermediate destinations along any travel corridor between departure and destination cities.
           </p>
           <a href="create-trip.html" class="btn btn-sm btn-outline">Explore Stops ➔</a>
         </div>
 
-        <!-- Feature 2: Interactive Timeline -->
-        <div class="card" style="text-align: center; padding: 2rem;">
-          <div style="font-size: 2.5rem; margin-bottom: 1rem;">🗺️</div>
-          <h3 style="font-size: 1.2rem; margin-bottom: 0.5rem;">Interactive Route Timeline</h3>
-          <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem;">
-            Visualize your entire journey from departure to destination with seamless stop additions.
+        <!-- Feature 2: Interactive Route Timeline -->
+        <div class="card" style="text-align: center; padding: 2.25rem 1.75rem;">
+          <div style="font-size: 2.75rem; margin-bottom: 1rem;">🗺️</div>
+          <h3 style="font-size: 1.25rem; margin-bottom: 0.5rem;">Interactive Route Mapping</h3>
+          <p style="color: var(--text-muted); font-size: 0.925rem; margin-bottom: 1.5rem; line-height: 1.55;">
+            Visualize your journey with geocoded pins, sequential stop waypoints, and clear interactive travel paths.
           </p>
-          <a href="create-trip.html" class="btn btn-sm btn-outline">Plan Route ➔</a>
+          <a href="map.html" class="btn btn-sm btn-outline">View Map ➔</a>
         </div>
 
         <!-- Feature 3: Automated Budget -->
-        <div class="card" style="text-align: center; padding: 2rem;">
-          <div style="font-size: 2.5rem; margin-bottom: 1rem;">💰</div>
-          <h3 style="font-size: 1.2rem; margin-bottom: 0.5rem;">Budget Estimation</h3>
-          <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem;">
-            Keep track of estimated travel, stay, and food expenses for all your trip stops.
+        <div class="card" style="text-align: center; padding: 2.25rem 1.75rem;">
+          <div style="font-size: 2.75rem; margin-bottom: 1rem;">💰</div>
+          <h3 style="font-size: 1.25rem; margin-bottom: 0.5rem;">Budget & Expense Tracking</h3>
+          <p style="color: var(--text-muted); font-size: 0.925rem; margin-bottom: 1.5rem; line-height: 1.55;">
+            Monitor your allocated budget, log expenses across categories, and track spending progress in real time.
           </p>
-          <a href="budget.html" class="btn btn-sm btn-outline">View Budget ➔</a>
+          <a href="budget.html" class="btn btn-sm btn-outline">Track Budget ➔</a>
         </div>
 
       </div>

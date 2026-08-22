@@ -73,6 +73,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const card = document.createElement('div');
       card.className = 'trip-card';
 
+      const destCity = trip.toCity || trip.destination || trip.title || 'Destination';
+      const destImg = typeof getDestinationImage === 'function' ? getDestinationImage(destCity) : 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?auto=format&fit=crop&w=800&q=80';
       const activityCount = trip.itinerary && Array.isArray(trip.itinerary) ? trip.itinerary.length : 0;
       const stopsCount = trip.addedStops && Array.isArray(trip.addedStops) ? trip.addedStops.length : 0;
       const dateRange = (trip.startDate && trip.endDate) 
@@ -80,6 +82,11 @@ document.addEventListener('DOMContentLoaded', () => {
         : (trip.startDate ? formatDate(trip.startDate) : 'Dates flexible');
 
       card.innerHTML = `
+        <div class="trip-card-img-wrapper">
+          <img src="${destImg}" alt="${escapeHtml(trip.title || 'Trip')}" class="trip-card-banner" loading="lazy">
+          <span class="trip-card-badge">📍 ${escapeHtml(trip.toCity || destCity)}</span>
+        </div>
+
         <div>
           <div class="trip-card-header">
             <h3 class="trip-card-title">${escapeHtml(trip.title || 'Untitled Trip')}</h3>
@@ -100,9 +107,17 @@ document.addEventListener('DOMContentLoaded', () => {
           <button type="button" class="btn-icon btn-icon-danger btn-delete-trip" data-id="${escapeHtml(trip.id)}" title="Delete trip">
             <span>🗑️</span> Delete
           </button>
-          <a href="itinerary.html?id=${encodeURIComponent(trip.id)}" class="btn btn-sm btn-primary">
-            <span>📋</span> View Itinerary
-          </a>
+          <div style="display: flex; gap: 0.35rem;">
+            <a href="budget.html?id=${encodeURIComponent(trip.id)}" class="btn btn-sm btn-outline" title="View Budget">
+              <span>💰</span>
+            </a>
+            <a href="map.html?id=${encodeURIComponent(trip.id)}" class="btn btn-sm btn-outline" title="View Map">
+              <span>🗺️</span>
+            </a>
+            <a href="itinerary.html?id=${encodeURIComponent(trip.id)}" class="btn btn-sm btn-primary">
+              <span>📋</span> Itinerary
+            </a>
+          </div>
         </div>
       `;
 
