@@ -1,7 +1,8 @@
 /**
- * GlobalTrotter - Storage Helper (Phase 1, 3 & 4)
- * Manages active trip route, user-created trips, itineraries, and expenses in browser storage.
- * Strictly no fake users, fake trips, or hardcoded sample budget/expense data.
+ * GlobalTrotter - Storage Helper (Phases 1, 3, 4, 5 & 6)
+ * Manages active trip route, user-created trips, itineraries, expenses,
+ * and collaborators in browser storage.
+ * Strictly no fake users, fake trips, or hardcoded sample data.
  */
 
 const ACTIVE_TRIP_KEY = 'globaltrotter_active_trip';
@@ -30,7 +31,8 @@ const Storage = {
         duration: '',
         addedStops: [],
         itinerary: [],
-        expenses: []
+        expenses: [],
+        collaborators: []
       };
     } catch (e) {
       console.warn('Unable to access sessionStorage:', e);
@@ -46,7 +48,8 @@ const Storage = {
         duration: '',
         addedStops: [],
         itinerary: [],
-        expenses: []
+        expenses: [],
+        collaborators: []
       };
     }
   },
@@ -152,7 +155,6 @@ const Storage = {
     const found = trips.find(t => String(t.id) === String(id));
     if (found) return found;
 
-    // Fallback to active trip if ID matches or if only active exists
     const active = this.getActiveTrip();
     return active;
   },
@@ -171,6 +173,9 @@ const Storage = {
     if (!tripData.expenses) {
       tripData.expenses = [];
     }
+    if (!tripData.collaborators) {
+      tripData.collaborators = [];
+    }
 
     const index = trips.findIndex(t => String(t.id) === String(tripData.id));
     if (index >= 0) {
@@ -179,8 +184,6 @@ const Storage = {
       trips.push(tripData);
     }
     this.saveTripsList(trips);
-
-    // Also update active session trip
     this.saveActiveTrip(tripData);
     return tripData;
   },
@@ -296,6 +299,49 @@ const Storage = {
     if (!trip || !trip.expenses) return false;
 
     trip.expenses = trip.expenses.filter(e => String(e.id) !== String(expenseId));
+    this.saveTrip(trip);
+    return true;
+  },
+
+  // ==========================================================================
+  // COLLABORATION CRUD OPERATIONS (PHASE 6)
+  // ==========================================================================
+
+  /**
+   * Get all collaborators for a trip
+   */
+  getTripCollaborators(tripId) {
+    const trip = this.getTripById(tripId);
+    return (trip && trip.collaborators) ? trip.collaborators : [];
+  },
+
+  /**
+   * Add a collaborator to a trip
+   */
+  addCollaborator(tripId, collaborator) {
+    const trip = this.getTripById(tripId);
+    if (!trip) return null;
+
+    if (!trip.collaborators) trip.collaborators = [];
+    const exists = trip.collaborators.some(c => c.email.toLowerCase() === collaborator.email.toLowerCase());
+    if (exists) return { error: 'Collaborator already added with this email.' };
+
+    collaborator.id = 'collab_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+    collaborator.role = collaborator.role || 'Viewer';
+    trip.collaborators.push(collaborator);
+
+    this.saveTrip(trip);
+    return collaborator;
+  },
+
+  /**
+   * Remove a collaborator from a trip
+   */
+  removeCollaborator(tripId, collaboratorId) {
+    const trip = this.getTripById(tripId);
+    if (!trip || !trip.collaborators) return false;
+
+    trip.collaborators = trip.collaborators.filter(c => String(c.id) !== String(collaboratorId));
     this.saveTrip(trip);
     return true;
   }

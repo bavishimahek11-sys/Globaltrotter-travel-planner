@@ -167,6 +167,21 @@ a:hover {
   margin: 0 auto;
 }
 
+/* Read-Only Banner for Viewers */
+.read-only-banner {
+  background: var(--primary-light);
+  border: 1px solid #bfdbfe;
+  color: #1e40af;
+  padding: 0.75rem 1.25rem;
+  border-radius: var(--radius-md);
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
 /* Main Content Layout */
 .main-content {
   flex: 1;
@@ -1089,6 +1104,113 @@ textarea.form-control {
   background: var(--bg-surface-alt);
   padding: 0.35rem 0.5rem;
   border-radius: var(--radius-sm);
+}
+
+/* ==========================================================================
+   PHASE 6: TRIP SHARING & COLLABORATION STYLES
+   ========================================================================== */
+
+.collaborators-section {
+  margin-top: 2.5rem;
+}
+
+.collaborators-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.collaborator-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 1.15rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition);
+}
+
+.collaborator-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: var(--shadow-md);
+}
+
+.collaborator-profile {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.collaborator-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary) 0%, #1d4ed8 100%);
+  color: var(--text-inverse);
+  font-weight: 700;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.collaborator-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.collaborator-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text-main);
+}
+
+.collaborator-email {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.badge-role {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--radius-sm);
+  display: inline-block;
+  margin-top: 0.2rem;
+  width: fit-content;
+}
+
+.badge-role.editor {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+
+.badge-role.viewer {
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+.badge-role.owner {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+/* Share Link Group */
+.share-link-group {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.share-link-input {
+  background: var(--bg-surface-alt);
+  font-family: monospace;
+  font-size: 0.85rem;
+  color: var(--text-main);
 }
 
 /* Modal Form Dialog */

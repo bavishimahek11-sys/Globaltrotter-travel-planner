@@ -1,17 +1,17 @@
 /**
- * GlobalTrotter - Trip Details, Itinerary, Budget & Interactive Map JS (Phases 3, 4 & 5)
+ * GlobalTrotter - Trip Details, Itinerary, Budget, Map & Collaboration JS (Phases 3, 4, 5 & 6)
  *
  * Manages rendering of dynamic trip details, grouped day-by-day activities,
  * activity creation/editing/deletion, dynamic budget calculations, expense tracking,
- * visual progress indicators, and interactive Leaflet map with route visualization.
+ * visual progress indicators, interactive Leaflet map, trip sharing, and collaborator management.
  *
- * NOTE: Strictly no fake users, no fake trips, no fake locations, and no hardcoded fake coordinates.
+ * NOTE: Strictly no fake users, no fake trips, no fake collaborators, and no hardcoded fake share URLs.
  *
  * ============================================================================
  * EXPECTED BACKEND REST API SPECIFICATION (For Future Backend Integration)
  * ============================================================================
  * 
- * 1. Get Trip Details with Itinerary, Coordinates & Expenses:
+ * 1. Get Trip Details with Itinerary, Coordinates, Expenses & Collaborators:
  *    GET /api/trips/:id
  *    Response: {
  *      id: "trip_123",
@@ -23,36 +23,25 @@
  *      endDate: "2026-09-14",
  *      budget: 20000,
  *      duration: "5 days",
- *      addedStops: [
- *        { city: "Vadodara", category: "Heritage • Food", duration: "4–6 hours", latitude: 22.3072, longitude: 73.1812 }
+ *      shareUrl: "https://globaltrotter.app/shared-trip.html?id=trip_123",
+ *      currentUserRole: "Owner", // "Owner" | "Editor" | "Viewer"
+ *      collaborators: [
+ *        { id: "collab_1", name: "Rahul Sharma", email: "rahul@example.com", role: "Editor" },
+ *        { id: "collab_2", name: "Priya Patel", email: "priya@example.com", role: "Viewer" }
  *      ],
  *      itinerary: [
- *        { 
- *          id: "act_1", 
- *          date: "2026-09-10", 
- *          time: "09:00", 
- *          activity: "Laxmi Vilas Palace", 
- *          location: "Vadodara", 
- *          latitude: 22.2937, 
- *          longitude: 73.1915, 
- *          notes: "Audio guide tour" 
- *        }
+ *        { id: "act_1", date: "2026-09-10", time: "09:00", activity: "Laxmi Vilas Palace", location: "Vadodara", latitude: 22.2937, longitude: 73.1915, notes: "Audio guide" }
  *      ],
  *      expenses: [
  *        { id: "exp_1", title: "Train Tickets", category: "Transport", amount: 2500, date: "2026-09-10", notes: "Express coach" }
  *      ]
  *    }
  *
- * 2. Itinerary Endpoints (with Coordinates):
- *    POST /api/trips/:id/itinerary -> Add activity (Body: { date, time, activity, location, latitude, longitude, notes })
- *    PUT /api/trips/:id/itinerary/:activityId -> Update activity
- *    DELETE /api/trips/:id/itinerary/:activityId -> Delete activity
- *
- * 3. Expense Management Endpoints:
- *    GET /api/trips/:id/expenses -> List expenses for trip
- *    POST /api/trips/:id/expenses -> Add expense (Body: { title, category, amount, date, notes })
- *    PUT /api/trips/:id/expenses/:expenseId -> Update expense (Body: { title, category, amount, date, notes })
- *    DELETE /api/trips/:id/expenses/:expenseId -> Delete expense
+ * 2. Collaborator & Sharing Endpoints (Phase 6):
+ *    GET /api/trips/:id/collaborators -> List collaborators
+ *    POST /api/trips/:id/collaborators/invite -> Invite companion (Body: { email, name, role })
+ *    DELETE /api/trips/:id/collaborators/:collaboratorId -> Remove collaborator
+ *    POST /api/trips/:id/share-link -> Generate shareable token/link
  * ============================================================================
  */
 
@@ -64,8 +53,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const categoryBreakdownCard = document.getElementById('categoryBreakdownCard');
   const categoriesList = document.getElementById('categoriesList');
   const expensesContainer = document.getElementById('expensesContainer');
+  const collaboratorsListContainer = document.getElementById('collaboratorsListContainer');
   const pageHeroTitle = document.getElementById('pageHeroTitle');
   const pageAlertContainer = document.getElementById('pageAlertContainer');
+  const readOnlyBanner = document.getElementById('readOnlyBanner');
 
   // Map Elements (Phase 5)
   const tripMapEl = document.getElementById('tripMap');
@@ -109,10 +100,33 @@ document.addEventListener('DOMContentLoaded', () => {
   const expenseNotesInput = document.getElementById('expenseNotes');
   const saveExpenseSubmitBtn = document.getElementById('saveExpenseSubmitBtn');
 
-  // Target Trip
+  // Share Modal Elements (Phase 6)
+  const shareModal = document.getElementById('shareModal');
+  const closeShareModalBtn = document.getElementById('closeShareModalBtn');
+  const cancelShareModalBtn = document.getElementById('cancelShareModalBtn');
+  const shareModalTripInfo = document.getElementById('shareModalTripInfo');
+  const shareLinkInput = document.getElementById('shareLinkInput');
+  const copyShareLinkBtn = document.getElementById('copyShareLinkBtn');
+  const shareCopyFeedback = document.getElementById('shareCopyFeedback');
+
+  // Invite Collaborator Modal Elements (Phase 6)
+  const inviteModal = document.getElementById('inviteModal');
+  const openInviteModalBtn = document.getElementById('openInviteModalBtn');
+  const closeInviteModalBtn = document.getElementById('closeInviteModalBtn');
+  const cancelInviteModalBtn = document.getElementById('cancelInviteModalBtn');
+  const inviteCollaboratorForm = document.getElementById('inviteCollaboratorForm');
+  const inviteModalAlertContainer = document.getElementById('inviteModalAlertContainer');
+  const inviteEmailInput = document.getElementById('inviteEmail');
+  const inviteNameInput = document.getElementById('inviteName');
+  const inviteRoleInput = document.getElementById('inviteRole');
+  const sendInviteSubmitBtn = document.getElementById('sendInviteSubmitBtn');
+
+  // Target Trip & Role
   const urlParams = new URLSearchParams(window.location.search);
   const tripId = urlParams.get('id') || 'active';
+  const requestedRole = urlParams.get('role'); // e.g. 'viewer'
   let currentTrip = Storage.getTripById(tripId);
+  const isViewerMode = requestedRole === 'viewer' || (currentTrip && currentTrip.currentUserRole === 'Viewer');
 
   // Initialize Page
   renderTripDetails();
@@ -120,6 +134,8 @@ document.addEventListener('DOMContentLoaded', () => {
   renderItinerary();
   renderBudgetAndExpenses();
   renderTripMap();
+  renderCollaborators();
+  applyRolePermissions();
   setupEventListeners();
 
   // ==========================================================================
@@ -141,11 +157,15 @@ document.addEventListener('DOMContentLoaded', () => {
       `;
       if (openAddActivityBtn) openAddActivityBtn.style.display = 'none';
       if (openAddExpenseBtn) openAddExpenseBtn.style.display = 'none';
+      if (openInviteModalBtn) openInviteModalBtn.style.display = 'none';
       return;
     }
 
-    if (openAddActivityBtn) openAddActivityBtn.style.display = 'inline-flex';
-    if (openAddExpenseBtn) openAddExpenseBtn.style.display = 'inline-flex';
+    if (!isViewerMode) {
+      if (openAddActivityBtn) openAddActivityBtn.style.display = 'inline-flex';
+      if (openAddExpenseBtn) openAddExpenseBtn.style.display = 'inline-flex';
+      if (openInviteModalBtn) openInviteModalBtn.style.display = 'inline-flex';
+    }
 
     const title = currentTrip.title || `Trip to ${currentTrip.toCity || currentTrip.destination || 'Destination'}`;
     const destination = currentTrip.destination || (currentTrip.fromCity && currentTrip.toCity ? `${currentTrip.fromCity} ➔ ${currentTrip.toCity}` : 'Custom Destination');
@@ -168,7 +188,10 @@ document.addEventListener('DOMContentLoaded', () => {
             <span>📍</span> ${escapeHtml(destination)}
           </div>
         </div>
-        <div>
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+          <button type="button" id="openShareModalBtn" class="btn btn-sm btn-outline">
+            <span>🔗</span> Share Trip
+          </button>
           <a href="trips.html" class="btn btn-sm btn-outline">
             <span>←</span> All Trips
           </a>
@@ -197,6 +220,11 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       </div>
     `;
+
+    const shareBtn = document.getElementById('openShareModalBtn');
+    if (shareBtn) {
+      shareBtn.addEventListener('click', openShareModal);
+    }
   }
 
   // ==========================================================================
@@ -210,7 +238,7 @@ document.addEventListener('DOMContentLoaded', () => {
         leafletMap = L.map('tripMap', {
           zoomControl: true,
           scrollWheelZoom: false
-        }).setView([20.5937, 78.9629], 5); // Default view over India
+        }).setView([20.5937, 78.9629], 5);
 
         L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
           maxZoom: 19,
@@ -236,7 +264,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const activities = currentTrip.itinerary || [];
     const validPoints = [];
 
-    // Extract valid coordinates from itinerary items
     activities.forEach((item, index) => {
       const lat = parseFloat(item.latitude || item.lat);
       const lng = parseFloat(item.longitude || item.lng);
@@ -255,10 +282,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         validPoints.push(pointData);
 
-        // Create Leaflet Marker
         const marker = L.marker([lat, lng]).addTo(markersLayer);
-        
-        // Popup Content
         const popupContent = `
           <div class="map-popup-card">
             <div class="map-popup-title">#${index + 1} ${escapeHtml(pointData.title)}</div>
@@ -268,7 +292,6 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
         marker.bindPopup(popupContent);
 
-        // Marker Click Listener -> Focus / Highlight corresponding Itinerary Card
         marker.on('click', () => {
           highlightItineraryCard(item.id);
         });
@@ -277,7 +300,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
 
-    // Draw sequenced route path if 2 or more coordinates exist
     if (validPoints.length >= 2) {
       const latLngs = validPoints.map(p => [p.lat, p.lng]);
       L.polyline(latLngs, {
@@ -288,7 +310,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }).addTo(markersLayer);
     }
 
-    // Update Map Bounds & Empty State Handling
     if (validPoints.length > 0) {
       if (mapEmptyState) mapEmptyState.style.display = 'none';
       if (tripMapEl) tripMapEl.style.height = '420px';
@@ -304,7 +325,6 @@ document.addEventListener('DOMContentLoaded', () => {
       if (mapPointsBadge) mapPointsBadge.textContent = '0 locations plotted';
     }
 
-    // Trigger map invalidation for proper rendering
     setTimeout(() => {
       if (leafletMap) leafletMap.invalidateSize();
     }, 200);
@@ -331,7 +351,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================================================
-  // 3. RENDER ITINERARY ACTIVITIES (GROUPED BY DAY / DATE)
+  // 3. RENDER ITINERARY ACTIVITIES
   // ==========================================================================
   function renderItinerary() {
     if (!itineraryDaysContainer) return;
@@ -351,9 +371,11 @@ document.addEventListener('DOMContentLoaded', () => {
           <span class="state-icon">📋</span>
           <div class="state-title">No activities planned yet.</div>
           <div class="state-desc">Your itinerary is currently empty. Start building your schedule by adding sights, tours, meal stops, or hotel check-ins.</div>
-          <button type="button" class="btn btn-primary btn-add-first-activity">
-            <span>+</span> Add Activity
-          </button>
+          ${!isViewerMode ? `
+            <button type="button" class="btn btn-primary btn-add-first-activity">
+              <span>+</span> Add Activity
+            </button>
+          ` : ''}
         </div>
       `;
 
@@ -364,7 +386,6 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // Group activities by date
     const grouped = groupActivitiesByDate(activities);
     const sortedDates = Object.keys(grouped).sort();
 
@@ -404,14 +425,16 @@ document.addEventListener('DOMContentLoaded', () => {
               ${item.notes ? `<div class="activity-notes">${escapeHtml(item.notes)}</div>` : ''}
             </div>
 
-            <div class="activity-actions">
-              <button type="button" class="btn-icon btn-edit-activity" data-id="${escapeHtml(item.id)}" title="Edit activity">
-                <span>✏️</span> Edit
-              </button>
-              <button type="button" class="btn-icon btn-icon-danger btn-delete-activity" data-id="${escapeHtml(item.id)}" title="Delete activity">
-                <span>🗑️</span> Delete
-              </button>
-            </div>
+            ${!isViewerMode ? `
+              <div class="activity-actions">
+                <button type="button" class="btn-icon btn-edit-activity" data-id="${escapeHtml(item.id)}" title="Edit activity">
+                  <span>✏️</span> Edit
+                </button>
+                <button type="button" class="btn-icon btn-icon-danger btn-delete-activity" data-id="${escapeHtml(item.id)}" title="Delete activity">
+                  <span>🗑️</span> Delete
+                </button>
+              </div>
+            ` : ''}
           </div>
         `;
       });
@@ -424,36 +447,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
     itineraryDaysContainer.innerHTML = html;
 
-    // Attach Event Listeners to Activity Cards (Focus Map on Card Click)
     itineraryDaysContainer.querySelectorAll('.activity-card').forEach(card => {
       card.addEventListener('click', (e) => {
-        if (e.target.closest('.btn-icon')) return; // Ignore when clicking edit/delete
+        if (e.target.closest('.btn-icon')) return;
         const actId = card.getAttribute('data-id');
         highlightItineraryCard(actId);
         focusMapOnActivity(actId);
       });
     });
 
-    // Attach Event Listeners to Edit and Delete Buttons
-    itineraryDaysContainer.querySelectorAll('.btn-edit-activity').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const actId = btn.getAttribute('data-id');
-        openEditModal(actId);
+    if (!isViewerMode) {
+      itineraryDaysContainer.querySelectorAll('.btn-edit-activity').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const actId = btn.getAttribute('data-id');
+          openEditModal(actId);
+        });
       });
-    });
 
-    itineraryDaysContainer.querySelectorAll('.btn-delete-activity').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const actId = btn.getAttribute('data-id');
-        handleDeleteActivity(actId);
+      itineraryDaysContainer.querySelectorAll('.btn-delete-activity').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const actId = btn.getAttribute('data-id');
+          handleDeleteActivity(actId);
+        });
       });
-    });
+    }
   }
 
   // ==========================================================================
-  // 4. RENDER BUDGET TRACKING & EXPENSES (PHASE 4)
+  // 4. RENDER BUDGET TRACKING & EXPENSES
   // ==========================================================================
   function renderBudgetAndExpenses() {
     if (!budgetSummaryBox || !expensesContainer) return;
@@ -476,7 +499,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const isExceeded = totalBudget > 0 && totalExpenses > totalBudget;
     const exceededAmount = isExceeded ? (totalExpenses - totalBudget) : 0;
 
-    // A. Render Budget Summary Box
     let progressClass = '';
     if (isExceeded || percentageUsed >= 100) {
       progressClass = 'danger';
@@ -538,7 +560,7 @@ document.addEventListener('DOMContentLoaded', () => {
       `}
     `;
 
-    // B. Render Category Breakdown
+    // Category Breakdown
     if (expenses.length > 0 && categoryBreakdownCard && categoriesList) {
       categoryBreakdownCard.style.display = 'block';
       
@@ -584,16 +606,18 @@ document.addEventListener('DOMContentLoaded', () => {
       categoryBreakdownCard.style.display = 'none';
     }
 
-    // C. Render Expenses List
+    // Expenses List
     if (expenses.length === 0) {
       expensesContainer.innerHTML = `
         <div class="state-box" style="padding: 2.5rem 1.5rem;">
           <span class="state-icon">💸</span>
           <div class="state-title">No expenses recorded yet.</div>
           <div class="state-desc">Keep track of your travel spending by logging transport, hotel, food, and activity costs.</div>
-          <button type="button" class="btn btn-primary btn-add-first-expense">
-            <span>+</span> Add Expense
-          </button>
+          ${!isViewerMode ? `
+            <button type="button" class="btn btn-primary btn-add-first-expense">
+              <span>+</span> Add Expense
+            </button>
+          ` : ''}
         </div>
       `;
 
@@ -622,14 +646,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
           <div class="expense-amount-box">
             <div class="expense-amount">₹${Number(item.amount).toLocaleString()}</div>
-            <div class="activity-actions">
-              <button type="button" class="btn-icon btn-edit-expense" data-id="${escapeHtml(item.id)}" title="Edit expense">
-                <span>✏️</span> Edit
-              </button>
-              <button type="button" class="btn-icon btn-icon-danger btn-delete-expense" data-id="${escapeHtml(item.id)}" title="Delete expense">
-                <span>🗑️</span> Delete
-              </button>
-            </div>
+            ${!isViewerMode ? `
+              <div class="activity-actions">
+                <button type="button" class="btn-icon btn-edit-expense" data-id="${escapeHtml(item.id)}" title="Edit expense">
+                  <span>✏️</span> Edit
+                </button>
+                <button type="button" class="btn-icon btn-icon-danger btn-delete-expense" data-id="${escapeHtml(item.id)}" title="Delete expense">
+                  <span>🗑️</span> Delete
+                </button>
+              </div>
+            ` : ''}
           </div>
         </div>
       `;
@@ -638,24 +664,246 @@ document.addEventListener('DOMContentLoaded', () => {
 
     expensesContainer.innerHTML = expHtml;
 
-    // Attach Event Listeners to Expense Edit & Delete Buttons
-    expensesContainer.querySelectorAll('.btn-edit-expense').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const expId = btn.getAttribute('data-id');
-        openEditExpenseModal(expId);
+    if (!isViewerMode) {
+      expensesContainer.querySelectorAll('.btn-edit-expense').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const expId = btn.getAttribute('data-id');
+          openEditExpenseModal(expId);
+        });
       });
-    });
 
-    expensesContainer.querySelectorAll('.btn-delete-expense').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const expId = btn.getAttribute('data-id');
-        handleDeleteExpense(expId);
+      expensesContainer.querySelectorAll('.btn-delete-expense').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const expId = btn.getAttribute('data-id');
+          handleDeleteExpense(expId);
+        });
       });
-    });
+    }
   }
 
   // ==========================================================================
-  // 5. EVENT LISTENERS SETUP
+  // 5. PHASE 6: RENDER COLLABORATORS
+  // ==========================================================================
+  function renderCollaborators() {
+    if (!collaboratorsListContainer) return;
+
+    currentTrip = Storage.getTripById(tripId);
+    if (!currentTrip) return;
+
+    const collaborators = currentTrip.collaborators || [];
+
+    if (collaborators.length === 0) {
+      collaboratorsListContainer.innerHTML = `
+        <div class="state-box" style="padding: 2.5rem 1.5rem;">
+          <span class="state-icon">👥</span>
+          <div class="state-title">No collaborators yet.</div>
+          <div class="state-desc">Invite travel companions via email to share access and collaborate on this trip plan.</div>
+          ${!isViewerMode ? `
+            <button type="button" class="btn btn-primary btn-add-first-collab">
+              <span>+</span> Invite Collaborator
+            </button>
+          ` : ''}
+        </div>
+      `;
+
+      const addFirstCollabBtn = collaboratorsListContainer.querySelector('.btn-add-first-collab');
+      if (addFirstCollabBtn) {
+        addFirstCollabBtn.addEventListener('click', openInviteModal);
+      }
+      return;
+    }
+
+    let html = '<div class="collaborators-grid">';
+    collaborators.forEach(c => {
+      const displayName = c.name || c.email.split('@')[0];
+      const initials = getInitials(displayName);
+      const roleClass = (c.role || 'Viewer').toLowerCase();
+
+      html += `
+        <div class="collaborator-card" data-id="${escapeHtml(c.id)}">
+          <div class="collaborator-profile">
+            <div class="collaborator-avatar">${escapeHtml(initials)}</div>
+            <div class="collaborator-info">
+              <span class="collaborator-name">${escapeHtml(displayName)}</span>
+              <span class="collaborator-email">${escapeHtml(c.email)}</span>
+              <span class="badge-role ${escapeHtml(roleClass)}">${escapeHtml(c.role || 'Viewer')}</span>
+            </div>
+          </div>
+
+          ${!isViewerMode ? `
+            <div>
+              <button type="button" class="btn-icon btn-icon-danger btn-delete-collab" data-id="${escapeHtml(c.id)}" title="Remove collaborator">
+                <span>✕</span> Remove
+              </button>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    });
+    html += '</div>';
+
+    collaboratorsListContainer.innerHTML = html;
+
+    if (!isViewerMode) {
+      collaboratorsListContainer.querySelectorAll('.btn-delete-collab').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const collabId = btn.getAttribute('data-id');
+          handleRemoveCollaborator(collabId);
+        });
+      });
+    }
+  }
+
+  function handleRemoveCollaborator(collabId) {
+    if (!currentTrip) return;
+    const collab = (currentTrip.collaborators || []).find(c => String(c.id) === String(collabId));
+    const name = collab ? (collab.name || collab.email) : 'this collaborator';
+
+    if (window.confirm(`Are you sure you want to remove ${name} from this trip?`)) {
+      Storage.removeCollaborator(currentTrip.id, collabId);
+      showPageAlert('Collaborator removed.', 'warning');
+      renderCollaborators();
+    }
+  }
+
+  // ==========================================================================
+  // 6. PHASE 6: SHARE TRIP & COPY LINK MODAL LOGIC
+  // ==========================================================================
+  function openShareModal() {
+    if (!shareModal) return;
+    currentTrip = Storage.getTripById(tripId);
+    if (!currentTrip) return;
+
+    if (shareCopyFeedback) shareCopyFeedback.innerHTML = '';
+
+    const title = currentTrip.title || 'Trip Plan';
+    if (shareModalTripInfo) {
+      shareModalTripInfo.textContent = `Trip: ${title}`;
+    }
+
+    // Generate legitimate share link
+    const origin = window.location.origin && window.location.origin !== 'null' ? window.location.origin : '';
+    const pathname = window.location.pathname ? window.location.pathname.replace('itinerary.html', 'shared-trip.html') : 'shared-trip.html';
+    const targetId = currentTrip.id || 'active';
+    const fullShareUrl = origin ? `${origin}${pathname}?id=${encodeURIComponent(targetId)}` : `shared-trip.html?id=${encodeURIComponent(targetId)}`;
+
+    if (shareLinkInput) {
+      shareLinkInput.value = fullShareUrl;
+    }
+
+    shareModal.classList.add('is-open');
+    shareModal.setAttribute('aria-hidden', 'false');
+  }
+
+  function closeShareModal() {
+    if (!shareModal) return;
+    shareModal.classList.remove('is-open');
+    shareModal.setAttribute('aria-hidden', 'true');
+  }
+
+  function handleCopyShareLink() {
+    if (!shareLinkInput) return;
+    const url = shareLinkInput.value.trim();
+
+    if (!url) {
+      if (shareCopyFeedback) {
+        shareCopyFeedback.innerHTML = '<span style="color: var(--danger);">Sharing link is not available yet.</span>';
+      }
+      return;
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(() => {
+        if (copyShareLinkBtn) copyShareLinkBtn.innerHTML = '<span>✓</span> Copied!';
+        if (shareCopyFeedback) {
+          shareCopyFeedback.innerHTML = '<span style="color: var(--success); font-weight: 600;">✓ Trip link copied to clipboard!</span>';
+        }
+        setTimeout(() => {
+          if (copyShareLinkBtn) copyShareLinkBtn.innerHTML = '<span>📋</span> Copy Link';
+        }, 3000);
+      }).catch(() => {
+        fallbackCopyText(url);
+      });
+    } else {
+      fallbackCopyText(url);
+    }
+  }
+
+  function fallbackCopyText(text) {
+    shareLinkInput.select();
+    try {
+      document.execCommand('copy');
+      if (shareCopyFeedback) {
+        shareCopyFeedback.innerHTML = '<span style="color: var(--success); font-weight: 600;">✓ Trip link copied!</span>';
+      }
+    } catch (err) {
+      if (shareCopyFeedback) {
+        shareCopyFeedback.innerHTML = '<span style="color: var(--danger);">Could not copy link automatically. Please select and copy manually.</span>';
+      }
+    }
+  }
+
+  // ==========================================================================
+  // 7. PHASE 6: INVITE COLLABORATOR MODAL LOGIC
+  // ==========================================================================
+  function openInviteModal() {
+    if (!inviteModal || !inviteCollaboratorForm) return;
+    clearInviteModalAlerts();
+    inviteCollaboratorForm.reset();
+    inviteModal.classList.add('is-open');
+    inviteModal.setAttribute('aria-hidden', 'false');
+    if (inviteEmailInput) inviteEmailInput.focus();
+  }
+
+  function closeInviteModal() {
+    if (!inviteModal) return;
+    inviteModal.classList.remove('is-open');
+    inviteModal.setAttribute('aria-hidden', 'true');
+    clearInviteModalAlerts();
+  }
+
+  function handleInviteFormSubmit(e) {
+    e.preventDefault();
+    clearInviteModalAlerts();
+
+    const email = inviteEmailInput ? inviteEmailInput.value.trim() : '';
+    const name = inviteNameInput ? inviteNameInput.value.trim() : '';
+    const role = inviteRoleInput ? inviteRoleInput.value.trim() : 'Viewer';
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email || !emailRegex.test(email)) {
+      showInviteModalAlert('Please enter a valid email address.');
+      if (inviteEmailInput) inviteEmailInput.focus();
+      return;
+    }
+
+    const collaboratorData = { email, name, role };
+    const result = Storage.addCollaborator(currentTrip.id, collaboratorData);
+
+    if (result && result.error) {
+      showInviteModalAlert(result.error);
+      return;
+    }
+
+    closeInviteModal();
+    showPageAlert(`Invitation sent to ${email} as ${role}!`, 'success');
+    renderCollaborators();
+  }
+
+  function applyRolePermissions() {
+    if (isViewerMode) {
+      if (readOnlyBanner) readOnlyBanner.style.display = 'flex';
+      if (openAddActivityBtn) openAddActivityBtn.style.display = 'none';
+      if (openAddExpenseBtn) openAddExpenseBtn.style.display = 'none';
+      if (openInviteModalBtn) openInviteModalBtn.style.display = 'none';
+    } else {
+      if (readOnlyBanner) readOnlyBanner.style.display = 'none';
+    }
+  }
+
+  // ==========================================================================
+  // 8. EVENT LISTENERS SETUP
   // ==========================================================================
   function setupEventListeners() {
     // Activity Modal Listeners
@@ -688,17 +936,45 @@ document.addEventListener('DOMContentLoaded', () => {
       expenseForm.addEventListener('submit', handleExpenseFormSubmit);
     }
 
+    // Share Modal Listeners (Phase 6)
+    if (closeShareModalBtn) closeShareModalBtn.addEventListener('click', closeShareModal);
+    if (cancelShareModalBtn) cancelShareModalBtn.addEventListener('click', closeShareModal);
+    if (copyShareLinkBtn) copyShareLinkBtn.addEventListener('click', handleCopyShareLink);
+
+    if (shareModal) {
+      shareModal.addEventListener('click', (e) => {
+        if (e.target === shareModal) closeShareModal();
+      });
+    }
+
+    // Invite Modal Listeners (Phase 6)
+    if (openInviteModalBtn) openInviteModalBtn.addEventListener('click', openInviteModal);
+    if (closeInviteModalBtn) closeInviteModalBtn.addEventListener('click', closeInviteModal);
+    if (cancelInviteModalBtn) cancelInviteModalBtn.addEventListener('click', closeInviteModal);
+
+    if (inviteModal) {
+      inviteModal.addEventListener('click', (e) => {
+        if (e.target === inviteModal) closeInviteModal();
+      });
+    }
+
+    if (inviteCollaboratorForm) {
+      inviteCollaboratorForm.addEventListener('submit', handleInviteFormSubmit);
+    }
+
     // Global Key Listener
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         if (activityModal && activityModal.classList.contains('is-open')) closeModal();
         if (expenseModal && expenseModal.classList.contains('is-open')) closeExpenseModal();
+        if (shareModal && shareModal.classList.contains('is-open')) closeShareModal();
+        if (inviteModal && inviteModal.classList.contains('is-open')) closeInviteModal();
       }
     });
   }
 
   // ==========================================================================
-  // 6. ACTIVITY MODAL LOGIC (WITH COORDINATES SUPPORT)
+  // 9. ACTIVITY & EXPENSE MODALS HELPERS
   // ==========================================================================
   function openAddModal() {
     if (!activityModal || !activityForm) return;
@@ -799,12 +1075,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    if (currentTrip && currentTrip.startDate && currentTrip.endDate) {
-      if (date < currentTrip.startDate || date > currentTrip.endDate) {
-        showModalAlert(`Note: Selected date (${formatDate(date)}) is outside your scheduled trip range (${formatDate(currentTrip.startDate)} – ${formatDate(currentTrip.endDate)}).`, 'warning');
-      }
-    }
-
     const activityData = {
       date,
       time,
@@ -841,9 +1111,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // ==========================================================================
-  // 7. EXPENSE MODAL LOGIC
-  // ==========================================================================
   function openAddExpenseModal() {
     if (!expenseModal || !expenseForm) return;
     clearExpenseModalAlerts();
@@ -953,9 +1220,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================================================
-  // 8. HELPER FUNCTIONS
+  // 10. GENERAL HELPERS
   // ==========================================================================
-
   function groupActivitiesByDate(activities) {
     const groups = {};
     activities.forEach(item => {
@@ -1009,6 +1275,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  function getInitials(name) {
+    if (!name) return 'U';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return name.slice(0, 2).toUpperCase();
+  }
+
   function showModalAlert(message, type = 'danger') {
     if (!modalAlertContainer) return;
     modalAlertContainer.innerHTML = `
@@ -1035,6 +1310,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function clearExpenseModalAlerts() {
     if (expenseModalAlertContainer) expenseModalAlertContainer.innerHTML = '';
+  }
+
+  function showInviteModalAlert(message, type = 'danger') {
+    if (!inviteModalAlertContainer) return;
+    inviteModalAlertContainer.innerHTML = `
+      <div class="alert alert-${type}">
+        <span>⚠️</span>
+        <div>${escapeHtml(message)}</div>
+      </div>
+    `;
+  }
+
+  function clearInviteModalAlerts() {
+    if (inviteModalAlertContainer) inviteModalAlertContainer.innerHTML = '';
   }
 
   function showPageAlert(message, type = 'success') {
