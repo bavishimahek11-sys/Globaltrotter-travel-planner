@@ -107,5 +107,40 @@ def init_db():
         )
     """)
 
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS trip_collaborators (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            trip_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            role TEXT NOT NULL DEFAULT 'viewer',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+            FOREIGN KEY (trip_id) REFERENCES trips(id)
+            ON DELETE CASCADE,
+
+            FOREIGN KEY (user_id) REFERENCES users(id)
+            ON DELETE CASCADE,
+
+            UNIQUE (trip_id, user_id),
+
+            CHECK (role IN ('viewer', 'editor'))
+        )
+    """)
+
+    # Trip share links table
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS trip_share_links (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            trip_id INTEGER NOT NULL UNIQUE,
+            share_token TEXT NOT NULL UNIQUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+            FOREIGN KEY (trip_id) REFERENCES trips(id)
+            ON DELETE CASCADE
+        )
+    """)
+
     conn.commit()
     conn.close()
+
+

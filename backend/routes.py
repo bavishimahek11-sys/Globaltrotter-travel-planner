@@ -1,8 +1,39 @@
 from flask import Blueprint, jsonify, request
 from database import get_db_connection
+import secrets
 
 api = Blueprint("api", __name__)
 
+
+def get_trip_permission(conn, trip_id, user_id):
+    trip = conn.execute("""
+        SELECT user_id
+        FROM trips
+        WHERE id = ?
+    """, (trip_id,)).fetchone()
+
+    if not trip:
+        return None
+
+    # Trip owner
+    if trip["user_id"] == user_id:
+        return "owner"
+
+    # Check collaborator
+    collaborator = conn.execute("""
+        SELECT role
+        FROM trip_collaborators
+        WHERE trip_id = ?
+        AND user_id = ?
+    """, (
+        trip_id,
+        user_id
+    )).fetchone()
+
+    if collaborator:
+        return collaborator["role"]
+
+    return None
 
 # --------------------------------------------------
 # HEALTH CHECK
@@ -426,12 +457,18 @@ def add_itinerary_item(trip_id):
             "error": "Request body is required"
         }), 400
 
+    user_id = data.get("user_id")
     activity = data.get("activity")
     destination_id = data.get("destination_id")
     activity_date = data.get("activity_date")
     start_time = data.get("start_time")
     end_time = data.get("end_time")
     notes = data.get("notes")
+
+    if user_id is None:
+        return jsonify({
+            "error": "User ID is required"
+        }), 400
 
     if not activity:
         return jsonify({
@@ -441,22 +478,34 @@ def add_itinerary_item(trip_id):
     conn = get_db_connection()
 
     try:
-        trip = conn.execute(
-            "SELECT id FROM trips WHERE id = ?",
-            (trip_id,)
-        ).fetchone()
+        # Check trip permission
+        permission = get_trip_permission(
+            conn,
+            trip_id,
+            int(user_id)
+        )
 
-        if not trip:
+        if permission is None:
             return jsonify({
-                "error": "Trip not found"
-            }), 404
+                "error": "You do not have access to this trip"
+            }), 403
 
-        if destination_id:
+        if permission not in ["owner", "editor"]:
+            return jsonify({
+                "error": "You do not have permission to modify this trip"
+            }), 403
+
+        # Check destination belongs to this trip
+        if destination_id is not None:
             destination = conn.execute("""
                 SELECT id
                 FROM destinations
-                WHERE id = ? AND trip_id = ?
-            """, (destination_id, trip_id)).fetchone()
+                WHERE id = ?
+                AND trip_id = ?
+            """, (
+                destination_id,
+                trip_id
+            )).fetchone()
 
             if not destination:
                 return jsonify({
@@ -486,18 +535,30 @@ def add_itinerary_item(trip_id):
 
         conn.commit()
 
+        itinerary_item = conn.execute("""
+            SELECT
+                itinerary.id,
+                itinerary.trip_id,
+                itinerary.destination_id,
+                itinerary.activity,
+                itinerary.activity_date,
+                itinerary.start_time,
+                itinerary.end_time,
+                itinerary.notes,
+                destinations.name AS destination_name,
+                destinations.city AS destination_city,
+                destinations.country AS destination_country,
+                destinations.latitude,
+                destinations.longitude
+            FROM itinerary
+            LEFT JOIN destinations
+                ON itinerary.destination_id = destinations.id
+            WHERE itinerary.id = ?
+        """, (cursor.lastrowid,)).fetchone()
+
         return jsonify({
             "message": "Itinerary item added successfully",
-            "itinerary": {
-                "id": cursor.lastrowid,
-                "trip_id": trip_id,
-                "destination_id": destination_id,
-                "activity": activity,
-                "activity_date": activity_date,
-                "start_time": start_time,
-                "end_time": end_time,
-                "notes": notes
-            }
+            "itinerary": dict(itinerary_item)
         }), 201
 
     finally:
@@ -558,7 +619,7 @@ def get_itinerary(trip_id):
 
     finally:
         conn.close()
-        
+
 @api.route("/api/itinerary/<int:itinerary_id>", methods=["DELETE"])
 def delete_itinerary_item(itinerary_id):
     conn = get_db_connection()
@@ -1267,6 +1328,413 @@ def update_expense(expense_id):
         return jsonify({
             "message": "Expense updated successfully",
             "expense": dict(updated_expense)
+        }), 200
+
+    finally:
+        conn.close()
+
+@api.route("/api/trips/<int:trip_id>/share", methods=["POST"])
+def create_share_link(trip_id):
+    conn = get_db_connection()
+
+    try:
+        trip = conn.execute("""
+            SELECT id, name
+            FROM trips
+            WHERE id = ?
+        """, (trip_id,)).fetchone()
+
+        if not trip:
+            return jsonify({
+                "error": "Trip not found"
+            }), 404
+
+        # Check whether a share link already exists
+        existing_link = conn.execute("""
+            SELECT share_token
+            FROM trip_share_links
+            WHERE trip_id = ?
+        """, (trip_id,)).fetchone()
+
+        if existing_link:
+            token = existing_link["share_token"]
+        else:
+            token = secrets.token_urlsafe(24)
+
+            conn.execute("""
+                INSERT INTO trip_share_links (
+                    trip_id,
+                    share_token
+                )
+                VALUES (?, ?)
+            """, (
+                trip_id,
+                token
+            ))
+
+            conn.commit()
+
+        return jsonify({
+            "message": "Share link created successfully",
+            "trip_id": trip_id,
+            "share_token": token,
+            "share_url": f"/shared-trip.html?token={token}"
+        }), 200
+
+    finally:
+        conn.close()
+
+@api.route("/api/shared-trips/<share_token>", methods=["GET"])
+def get_shared_trip(share_token):
+    conn = get_db_connection()
+
+    try:
+        trip = conn.execute("""
+            SELECT
+                trips.id,
+                trips.name,
+                trips.user_id,
+                trips.start_date,
+                trips.end_date,
+                trips.budget
+            FROM trip_share_links
+            JOIN trips
+                ON trip_share_links.trip_id = trips.id
+            WHERE trip_share_links.share_token = ?
+        """, (share_token,)).fetchone()
+
+        if not trip:
+            return jsonify({
+                "error": "Invalid or expired share link"
+            }), 404
+
+        trip_id = trip["id"]
+
+        destinations = conn.execute("""
+            SELECT
+                id,
+                trip_id,
+                name,
+                city,
+                country,
+                visit_date,
+                notes,
+                latitude,
+                longitude
+            FROM destinations
+            WHERE trip_id = ?
+            ORDER BY visit_date ASC, id ASC
+        """, (trip_id,)).fetchall()
+
+        itinerary = conn.execute("""
+            SELECT
+                itinerary.id,
+                itinerary.trip_id,
+                itinerary.destination_id,
+                itinerary.activity,
+                itinerary.activity_date,
+                itinerary.start_time,
+                itinerary.end_time,
+                itinerary.notes,
+                destinations.name AS destination_name,
+                destinations.latitude,
+                destinations.longitude
+            FROM itinerary
+            LEFT JOIN destinations
+                ON itinerary.destination_id = destinations.id
+            WHERE itinerary.trip_id = ?
+            ORDER BY
+                itinerary.activity_date ASC,
+                itinerary.start_time ASC,
+                itinerary.id ASC
+        """, (trip_id,)).fetchall()
+
+        collaborators = conn.execute("""
+            SELECT
+                users.id,
+                users.name,
+                users.email,
+                trip_collaborators.role
+            FROM trip_collaborators
+            JOIN users
+                ON trip_collaborators.user_id = users.id
+            WHERE trip_collaborators.trip_id = ?
+        """, (trip_id,)).fetchall()
+
+        return jsonify({
+            "trip": dict(trip),
+            "destinations": [
+                dict(destination)
+                for destination in destinations
+            ],
+            "itinerary": [
+                dict(item)
+                for item in itinerary
+            ],
+            "collaborators": [
+                dict(user)
+                for user in collaborators
+            ]
+        }), 200
+
+    finally:
+        conn.close()
+
+@api.route("/api/trips/<int:trip_id>/collaborators", methods=["GET"])
+def get_collaborators(trip_id):
+    conn = get_db_connection()
+
+    try:
+        trip = conn.execute("""
+            SELECT id
+            FROM trips
+            WHERE id = ?
+        """, (trip_id,)).fetchone()
+
+        if not trip:
+            return jsonify({
+                "error": "Trip not found"
+            }), 404
+
+        owner = conn.execute("""
+            SELECT
+                id,
+                name,
+                email
+            FROM users
+            JOIN trips
+                ON trips.user_id = users.id
+            WHERE trips.id = ?
+        """, (trip_id,)).fetchone()
+
+        collaborators = conn.execute("""
+            SELECT
+                users.id,
+                users.name,
+                users.email,
+                trip_collaborators.role
+            FROM trip_collaborators
+            JOIN users
+                ON trip_collaborators.user_id = users.id
+            WHERE trip_collaborators.trip_id = ?
+            ORDER BY users.name
+        """, (trip_id,)).fetchall()
+
+        result = []
+
+        if owner:
+            result.append({
+                "id": owner["id"],
+                "name": owner["name"],
+                "email": owner["email"],
+                "role": "owner"
+            })
+
+        result.extend([
+            dict(collaborator)
+            for collaborator in collaborators
+        ])
+
+        return jsonify({
+            "collaborators": result
+        }), 200
+
+    finally:
+        conn.close()
+
+@api.route("/api/trips/<int:trip_id>/collaborators", methods=["POST"])
+def add_collaborator(trip_id):
+    data = request.get_json()
+
+    if not data:
+        return jsonify({
+            "error": "Request body is required"
+        }), 400
+
+    email = data.get("email")
+    role = data.get("role", "viewer")
+
+    if not email:
+        return jsonify({
+            "error": "Email is required"
+        }), 400
+
+    email = email.strip().lower()
+
+    if role not in ["viewer", "editor"]:
+        return jsonify({
+            "error": "Role must be viewer or editor"
+        }), 400
+
+    conn = get_db_connection()
+
+    try:
+        trip = conn.execute("""
+            SELECT id, user_id
+            FROM trips
+            WHERE id = ?
+        """, (trip_id,)).fetchone()
+
+        if not trip:
+            return jsonify({
+                "error": "Trip not found"
+            }), 404
+
+        user = conn.execute("""
+            SELECT id, name, email
+            FROM users
+            WHERE LOWER(email) = ?
+        """, (email,)).fetchone()
+
+        if not user:
+            return jsonify({
+                "error": "User with this email does not exist"
+            }), 404
+
+        # Owner cannot be added as collaborator
+        if user["id"] == trip["user_id"]:
+            return jsonify({
+                "error": "Trip owner is already the owner"
+            }), 400
+
+        existing = conn.execute("""
+            SELECT id
+            FROM trip_collaborators
+            WHERE trip_id = ?
+            AND user_id = ?
+        """, (
+            trip_id,
+            user["id"]
+        )).fetchone()
+
+        if existing:
+            return jsonify({
+                "error": "User is already a collaborator"
+            }), 409
+
+        conn.execute("""
+            INSERT INTO trip_collaborators (
+                trip_id,
+                user_id,
+                role
+            )
+            VALUES (?, ?, ?)
+        """, (
+            trip_id,
+            user["id"],
+            role
+        ))
+
+        conn.commit()
+
+        return jsonify({
+            "message": "Collaborator added successfully",
+            "collaborator": {
+                "id": user["id"],
+                "name": user["name"],
+                "email": user["email"],
+                "role": role
+            }
+        }), 201
+
+    finally:
+        conn.close()
+
+@api.route(
+    "/api/trips/<int:trip_id>/collaborators/<int:user_id>",
+    methods=["PUT"]
+)
+def update_collaborator_role(trip_id, user_id):
+    data = request.get_json()
+
+    if not data:
+        return jsonify({
+            "error": "Request body is required"
+        }), 400
+
+    role = data.get("role")
+
+    if role not in ["viewer", "editor"]:
+        return jsonify({
+            "error": "Role must be viewer or editor"
+        }), 400
+
+    conn = get_db_connection()
+
+    try:
+        collaborator = conn.execute("""
+            SELECT id
+            FROM trip_collaborators
+            WHERE trip_id = ?
+            AND user_id = ?
+        """, (
+            trip_id,
+            user_id
+        )).fetchone()
+
+        if not collaborator:
+            return jsonify({
+                "error": "Collaborator not found"
+            }), 404
+
+        conn.execute("""
+            UPDATE trip_collaborators
+            SET role = ?
+            WHERE trip_id = ?
+            AND user_id = ?
+        """, (
+            role,
+            trip_id,
+            user_id
+        ))
+
+        conn.commit()
+
+        return jsonify({
+            "message": "Collaborator role updated successfully",
+            "user_id": user_id,
+            "role": role
+        }), 200
+
+    finally:
+        conn.close()
+
+@api.route(
+    "/api/trips/<int:trip_id>/collaborators/<int:user_id>",
+    methods=["DELETE"]
+)
+def remove_collaborator(trip_id, user_id):
+    conn = get_db_connection()
+
+    try:
+        collaborator = conn.execute("""
+            SELECT id
+            FROM trip_collaborators
+            WHERE trip_id = ?
+            AND user_id = ?
+        """, (
+            trip_id,
+            user_id
+        )).fetchone()
+
+        if not collaborator:
+            return jsonify({
+                "error": "Collaborator not found"
+            }), 404
+
+        conn.execute("""
+            DELETE FROM trip_collaborators
+            WHERE trip_id = ?
+            AND user_id = ?
+        """, (
+            trip_id,
+            user_id
+        ))
+
+        conn.commit()
+
+        return jsonify({
+            "message": "Collaborator removed successfully"
         }), 200
 
     finally:
