@@ -55,6 +55,24 @@ def init_db():
             ON DELETE CASCADE
         )
     """)
+    # Add location columns to existing destinations table
+    destination_columns = conn.execute(
+            "PRAGMA table_info(destinations)"
+        ).fetchall()
+
+    column_names = [column["name"] for column in destination_columns]
+
+    if "latitude" not in column_names:
+            conn.execute("""
+                ALTER TABLE destinations
+                ADD COLUMN latitude REAL
+            """)
+
+    if "longitude" not in column_names:
+            conn.execute("""
+                ALTER TABLE destinations
+                ADD COLUMN longitude REAL
+            """)
 
     # Itinerary table
     conn.execute("""

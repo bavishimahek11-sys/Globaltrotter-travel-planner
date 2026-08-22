@@ -279,19 +279,48 @@ def add_destination(trip_id):
     country = data.get("country")
     visit_date = data.get("visit_date")
     notes = data.get("notes")
+    latitude = data.get("latitude")
+    longitude = data.get("longitude")
 
     if not name:
         return jsonify({
             "error": "Destination name is required"
         }), 400
 
+    # Coordinates are optional.
+    # If supplied, both must be valid numbers.
+    if latitude is not None or longitude is not None:
+        if latitude is None or longitude is None:
+            return jsonify({
+                "error": "Both latitude and longitude are required"
+            }), 400
+
+        try:
+            latitude = float(latitude)
+            longitude = float(longitude)
+        except (TypeError, ValueError):
+            return jsonify({
+                "error": "Latitude and longitude must be numbers"
+            }), 400
+
+        if not -90 <= latitude <= 90:
+            return jsonify({
+                "error": "Latitude must be between -90 and 90"
+            }), 400
+
+        if not -180 <= longitude <= 180:
+            return jsonify({
+                "error": "Longitude must be between -180 and 180"
+            }), 400
+
     conn = get_db_connection()
 
     try:
-        trip = conn.execute(
-            "SELECT id FROM trips WHERE id = ?",
-            (trip_id,)
-        ).fetchone()
+        trip = conn.execute("""
+            SELECT id
+            FROM trips
+            WHERE id = ?
+        """, (trip_id,)).fetchone()
 
         if not trip:
             return jsonify({
@@ -305,31 +334,42 @@ def add_destination(trip_id):
                 city,
                 country,
                 visit_date,
-                notes
+                notes,
+                latitude,
+                longitude
             )
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             trip_id,
             name,
             city,
             country,
             visit_date,
-            notes
+            notes,
+            latitude,
+            longitude
         ))
 
         conn.commit()
 
+        destination = conn.execute("""
+            SELECT
+                id,
+                trip_id,
+                name,
+                city,
+                country,
+                visit_date,
+                notes,
+                latitude,
+                longitude
+            FROM destinations
+            WHERE id = ?
+        """, (cursor.lastrowid,)).fetchone()
+
         return jsonify({
             "message": "Destination added successfully",
-            "destination": {
-                "id": cursor.lastrowid,
-                "trip_id": trip_id,
-                "name": name,
-                "city": city,
-                "country": country,
-                "visit_date": visit_date,
-                "notes": notes
-            }
+            "destination": dict(destination)
         }), 201
 
     finally:
@@ -340,10 +380,11 @@ def get_destinations(trip_id):
     conn = get_db_connection()
 
     try:
-        trip = conn.execute(
-            "SELECT id FROM trips WHERE id = ?",
-            (trip_id,)
-        ).fetchone()
+        trip = conn.execute("""
+            SELECT id
+            FROM trips
+            WHERE id = ?
+        """, (trip_id,)).fetchone()
 
         if not trip:
             return jsonify({
@@ -358,14 +399,19 @@ def get_destinations(trip_id):
                 city,
                 country,
                 visit_date,
-                notes
+                notes,
+                latitude,
+                longitude
             FROM destinations
             WHERE trip_id = ?
-            ORDER BY visit_date ASC
+            ORDER BY visit_date ASC, id ASC
         """, (trip_id,)).fetchall()
 
         return jsonify({
-            "destinations": [dict(destination) for destination in destinations]
+            "destinations": [
+                dict(destination)
+                for destination in destinations
+            ]
         }), 200
 
     finally:
@@ -462,10 +508,11 @@ def get_itinerary(trip_id):
     conn = get_db_connection()
 
     try:
-        trip = conn.execute(
-            "SELECT id FROM trips WHERE id = ?",
-            (trip_id,)
-        ).fetchone()
+        trip = conn.execute("""
+            SELECT id
+            FROM trips
+            WHERE id = ?
+        """, (trip_id,)).fetchone()
 
         if not trip:
             return jsonify({
@@ -482,23 +529,36 @@ def get_itinerary(trip_id):
                 itinerary.start_time,
                 itinerary.end_time,
                 itinerary.notes,
-                destinations.name AS destination_name
+
+                destinations.name AS destination_name,
+                destinations.city AS destination_city,
+                destinations.country AS destination_country,
+                destinations.latitude AS latitude,
+                destinations.longitude AS longitude
+
             FROM itinerary
+
             LEFT JOIN destinations
                 ON itinerary.destination_id = destinations.id
+
             WHERE itinerary.trip_id = ?
+
             ORDER BY
                 itinerary.activity_date ASC,
-                itinerary.start_time ASC
+                itinerary.start_time ASC,
+                itinerary.id ASC
         """, (trip_id,)).fetchall()
 
         return jsonify({
-            "itinerary": [dict(item) for item in itinerary]
+            "itinerary": [
+                dict(item)
+                for item in itinerary
+            ]
         }), 200
 
     finally:
         conn.close()
-
+        
 @api.route("/api/itinerary/<int:itinerary_id>", methods=["DELETE"])
 def delete_itinerary_item(itinerary_id):
     conn = get_db_connection()
@@ -905,11 +965,37 @@ def update_destination(destination_id):
     country = data.get("country")
     visit_date = data.get("visit_date")
     notes = data.get("notes")
+    latitude = data.get("latitude")
+    longitude = data.get("longitude")
 
     if not name:
         return jsonify({
             "error": "Destination name is required"
         }), 400
+
+    if latitude is not None or longitude is not None:
+        if latitude is None or longitude is None:
+            return jsonify({
+                "error": "Both latitude and longitude are required"
+            }), 400
+
+        try:
+            latitude = float(latitude)
+            longitude = float(longitude)
+        except (TypeError, ValueError):
+            return jsonify({
+                "error": "Latitude and longitude must be numbers"
+            }), 400
+
+        if not -90 <= latitude <= 90:
+            return jsonify({
+                "error": "Latitude must be between -90 and 90"
+            }), 400
+
+        if not -180 <= longitude <= 180:
+            return jsonify({
+                "error": "Longitude must be between -180 and 180"
+            }), 400
 
     conn = get_db_connection()
 
@@ -931,7 +1017,9 @@ def update_destination(destination_id):
                 city = ?,
                 country = ?,
                 visit_date = ?,
-                notes = ?
+                notes = ?,
+                latitude = ?,
+                longitude = ?
             WHERE id = ?
         """, (
             name,
@@ -939,6 +1027,8 @@ def update_destination(destination_id):
             country,
             visit_date,
             notes,
+            latitude,
+            longitude,
             destination_id
         ))
 
@@ -952,7 +1042,9 @@ def update_destination(destination_id):
                 city,
                 country,
                 visit_date,
-                notes
+                notes,
+                latitude,
+                longitude
             FROM destinations
             WHERE id = ?
         """, (destination_id,)).fetchone()
