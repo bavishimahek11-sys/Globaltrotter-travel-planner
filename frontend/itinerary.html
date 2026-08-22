@@ -7,6 +7,8 @@
   <!-- Stylesheets -->
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/responsive.css">
+  <!-- Leaflet Map CSS (Phase 5) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 </head>
 <body>
 
@@ -35,7 +37,7 @@
   <section class="page-hero">
     <div class="container">
       <h1 id="pageHeroTitle">Trip Details & Itinerary</h1>
-      <p id="pageHeroSubtitle">Manage your day-by-day activities, track expenses, and monitor your travel budget.</p>
+      <p id="pageHeroSubtitle">Manage your day-by-day activities, track expenses, and explore your interactive route map.</p>
     </div>
   </section>
 
@@ -51,7 +53,29 @@
         <!-- Rendered dynamically via js/itinerary.js -->
       </section>
 
-      <!-- 2. Itinerary Section -->
+      <!-- 2. Phase 5: Interactive Route Map Section -->
+      <section id="mapSection" class="map-section">
+        <div class="itinerary-section-header">
+          <div>
+            <h2 class="section-title">
+              <span>🗺️</span> Interactive Route Map
+            </h2>
+            <p class="section-subtitle" style="margin-bottom: 0;">Visualize your destinations, itinerary places, and sequenced route path.</p>
+          </div>
+          <span id="mapPointsBadge" class="map-badge-info">0 locations plotted</span>
+        </div>
+
+        <div class="map-card-wrapper">
+          <div id="tripMap" class="map-container"></div>
+          <div id="mapEmptyState" class="state-box" style="display: none; border-radius: 0; padding: 2.5rem 1.5rem; border: none; border-top: 1px dashed var(--border-color);">
+            <span class="state-icon">📍</span>
+            <div class="state-title">Location data is not available for this trip</div>
+            <div class="state-desc">No coordinates have been recorded for your scheduled activities yet. Add activities with latitude and longitude coordinates to visualize your travel sequence on the map.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. Itinerary Section -->
       <section class="itinerary-section">
         
         <div class="itinerary-section-header">
@@ -76,7 +100,7 @@
 
       </section>
 
-      <!-- 3. Phase 4: Budget Tracking & Expense Management Section -->
+      <!-- 4. Budget Tracking & Expenses Section -->
       <section id="budgetSection" class="budget-section">
         
         <div class="itinerary-section-header">
@@ -125,7 +149,7 @@
   </main>
 
   <!-- =======================================================================
-       MODAL 1: ADD / EDIT ACTIVITY MODAL DIALOG
+       MODAL 1: ADD / EDIT ACTIVITY MODAL DIALOG (WITH LAT/LNG COORDINATES)
        ======================================================================= -->
   <div id="activityModal" class="modal-backdrop" aria-hidden="true">
     <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
@@ -165,16 +189,33 @@
 
           <div class="form-group">
             <label for="activityLocation" class="form-label">
-              <span>📍</span> Location <span style="color: var(--danger);">*</span>
+              <span>📍</span> Location Name <span style="color: var(--danger);">*</span>
             </label>
             <input type="text" id="activityLocation" class="form-control" placeholder="e.g. Vadodara, Gujarat" required>
+          </div>
+
+          <!-- Phase 5: Optional Coordinates for Map Placements -->
+          <div class="form-row">
+            <div class="form-group">
+              <label for="activityLat" class="form-label">
+                <span>🌐</span> Latitude (Optional)
+              </label>
+              <input type="number" id="activityLat" class="form-control" placeholder="e.g. 22.2937" step="any" min="-90" max="90">
+            </div>
+
+            <div class="form-group">
+              <label for="activityLng" class="form-label">
+                <span>🌐</span> Longitude (Optional)
+              </label>
+              <input type="number" id="activityLng" class="form-control" placeholder="e.g. 73.1915" step="any" min="-180" max="180">
+            </div>
           </div>
 
           <div class="form-group">
             <label for="activityNotes" class="form-label">
               <span>📝</span> Notes & Sightseeing Details
             </label>
-            <textarea id="activityNotes" class="form-control" rows="3" placeholder="Add entry ticket info, opening hours, or special tips..."></textarea>
+            <textarea id="activityNotes" class="form-control" rows="2" placeholder="Add entry ticket info, opening hours, or special tips..."></textarea>
           </div>
         </div>
 
@@ -190,7 +231,7 @@
   </div>
 
   <!-- =======================================================================
-       MODAL 2: ADD / EDIT EXPENSE MODAL DIALOG (PHASE 4)
+       MODAL 2: ADD / EDIT EXPENSE MODAL DIALOG
        ======================================================================= -->
   <div id="expenseModal" class="modal-backdrop" aria-hidden="true">
     <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="expenseModalTitle">
@@ -205,7 +246,6 @@
           <div id="expenseModalAlertContainer"></div>
           <input type="hidden" id="editingExpenseId" value="">
 
-          <!-- Expense Title -->
           <div class="form-group">
             <label for="expenseTitle" class="form-label">
               <span>🏷️</span> Expense Title <span style="color: var(--danger);">*</span>
@@ -213,7 +253,6 @@
             <input type="text" id="expenseTitle" class="form-control" placeholder="e.g. Hotel Stay, Train Tickets, Museum Entry" required>
           </div>
 
-          <!-- Category & Amount Row -->
           <div class="form-row">
             <div class="form-group">
               <label for="expenseCategory" class="form-label">
@@ -238,7 +277,6 @@
             </div>
           </div>
 
-          <!-- Date -->
           <div class="form-group">
             <label for="expenseDate" class="form-label">
               <span>🗓️</span> Date <span style="color: var(--danger);">*</span>
@@ -246,7 +284,6 @@
             <input type="date" id="expenseDate" class="form-control" required>
           </div>
 
-          <!-- Notes -->
           <div class="form-group">
             <label for="expenseNotes" class="form-label">
               <span>📝</span> Notes (Optional)
@@ -273,7 +310,10 @@
     </div>
   </footer>
 
-  <!-- Scripts -->
+  <!-- Leaflet Map JS (Phase 5) -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <!-- Application Scripts -->
   <script src="js/storage.js"></script>
   <script src="js/app.js"></script>
   <script src="js/itinerary.js"></script>

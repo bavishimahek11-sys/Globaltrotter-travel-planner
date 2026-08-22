@@ -582,7 +582,7 @@ textarea.form-control {
 }
 
 /* ==========================================================================
-   PHASE 3 & 4: TRIP DETAILS, ITINERARY & BUDGET STYLING
+   PHASE 3: TRIP DETAILS & ITINERARY STYLES
    ========================================================================== */
 
 .trip-details-header {
@@ -709,11 +709,18 @@ textarea.form-control {
   transition: var(--transition);
   position: relative;
   gap: 1rem;
+  cursor: pointer;
 }
 
 .activity-card:hover {
   border-color: #cbd5e1;
   box-shadow: var(--shadow-md);
+}
+
+.activity-card.is-active-marker {
+  border-color: var(--primary);
+  background: var(--primary-light);
+  box-shadow: 0 0 0 3px var(--primary-focus);
 }
 
 .activity-main {
@@ -1018,6 +1025,70 @@ textarea.form-control {
   font-weight: 800;
   color: var(--text-main);
   white-space: nowrap;
+}
+
+/* ==========================================================================
+   PHASE 5: INTERACTIVE MAP & ROUTE VISUALIZATION STYLES
+   ========================================================================== */
+
+.map-section {
+  margin-top: 2.5rem;
+}
+
+.map-card-wrapper {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.map-container {
+  width: 100%;
+  height: 420px;
+  background: var(--bg-surface-alt);
+  position: relative;
+  z-index: 1;
+}
+
+.map-badge-info {
+  background: var(--primary-light);
+  color: var(--primary);
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0.25rem 0.65rem;
+  border-radius: var(--radius-full);
+}
+
+.leaflet-popup-content-wrapper {
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  font-family: inherit;
+}
+
+.map-popup-card {
+  padding: 0.25rem;
+}
+
+.map-popup-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 0.25rem;
+}
+
+.map-popup-meta {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 0.35rem;
+}
+
+.map-popup-notes {
+  font-size: 0.8rem;
+  color: #475569;
+  background: var(--bg-surface-alt);
+  padding: 0.35rem 0.5rem;
+  border-radius: var(--radius-sm);
 }
 
 /* Modal Form Dialog */

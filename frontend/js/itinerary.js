@@ -1,17 +1,17 @@
 /**
- * GlobalTrotter - Trip Details, Itinerary & Budget JS (Phase 3 & 4)
+ * GlobalTrotter - Trip Details, Itinerary, Budget & Interactive Map JS (Phases 3, 4 & 5)
  *
  * Manages rendering of dynamic trip details, grouped day-by-day activities,
  * activity creation/editing/deletion, dynamic budget calculations, expense tracking,
- * visual progress indicators, and category breakdowns.
+ * visual progress indicators, and interactive Leaflet map with route visualization.
  *
- * NOTE: Strictly no fake users, no fake trips, and no hardcoded demo budget/expense data.
+ * NOTE: Strictly no fake users, no fake trips, no fake locations, and no hardcoded fake coordinates.
  *
  * ============================================================================
  * EXPECTED BACKEND REST API SPECIFICATION (For Future Backend Integration)
  * ============================================================================
  * 
- * 1. Get Trip Details with Itinerary & Expenses:
+ * 1. Get Trip Details with Itinerary, Coordinates & Expenses:
  *    GET /api/trips/:id
  *    Response: {
  *      id: "trip_123",
@@ -23,21 +23,32 @@
  *      endDate: "2026-09-14",
  *      budget: 20000,
  *      duration: "5 days",
- *      addedStops: [...],
+ *      addedStops: [
+ *        { city: "Vadodara", category: "Heritage • Food", duration: "4–6 hours", latitude: 22.3072, longitude: 73.1812 }
+ *      ],
  *      itinerary: [
- *        { id: "act_1", date: "2026-09-10", time: "09:00", activity: "Palace Visit", location: "Vadodara", notes: "Sightseeing" }
+ *        { 
+ *          id: "act_1", 
+ *          date: "2026-09-10", 
+ *          time: "09:00", 
+ *          activity: "Laxmi Vilas Palace", 
+ *          location: "Vadodara", 
+ *          latitude: 22.2937, 
+ *          longitude: 73.1915, 
+ *          notes: "Audio guide tour" 
+ *        }
  *      ],
  *      expenses: [
- *        { id: "exp_1", title: "Train Tickets", category: "Transport", amount: 2500, date: "2026-09-10", notes: "Expressway coach" }
+ *        { id: "exp_1", title: "Train Tickets", category: "Transport", amount: 2500, date: "2026-09-10", notes: "Express coach" }
  *      ]
  *    }
  *
- * 2. Itinerary Endpoints:
- *    POST /api/trips/:id/itinerary -> Add activity (Body: { date, time, activity, location, notes })
+ * 2. Itinerary Endpoints (with Coordinates):
+ *    POST /api/trips/:id/itinerary -> Add activity (Body: { date, time, activity, location, latitude, longitude, notes })
  *    PUT /api/trips/:id/itinerary/:activityId -> Update activity
  *    DELETE /api/trips/:id/itinerary/:activityId -> Delete activity
  *
- * 3. Expense Management Endpoints (Phase 4):
+ * 3. Expense Management Endpoints:
  *    GET /api/trips/:id/expenses -> List expenses for trip
  *    POST /api/trips/:id/expenses -> Add expense (Body: { title, category, amount, date, notes })
  *    PUT /api/trips/:id/expenses/:expenseId -> Update expense (Body: { title, category, amount, date, notes })
@@ -55,6 +66,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const expensesContainer = document.getElementById('expensesContainer');
   const pageHeroTitle = document.getElementById('pageHeroTitle');
   const pageAlertContainer = document.getElementById('pageAlertContainer');
+
+  // Map Elements (Phase 5)
+  const tripMapEl = document.getElementById('tripMap');
+  const mapEmptyState = document.getElementById('mapEmptyState');
+  const mapPointsBadge = document.getElementById('mapPointsBadge');
+  let leafletMap = null;
+  let markersLayer = null;
+  let activityMarkersMap = {};
   
   // Activity Modal Elements
   const activityModal = document.getElementById('activityModal');
@@ -69,10 +88,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const activityTimeInput = document.getElementById('activityTime');
   const activityNameInput = document.getElementById('activityName');
   const activityLocationInput = document.getElementById('activityLocation');
+  const activityLatInput = document.getElementById('activityLat');
+  const activityLngInput = document.getElementById('activityLng');
   const activityNotesInput = document.getElementById('activityNotes');
   const saveActivitySubmitBtn = document.getElementById('saveActivitySubmitBtn');
 
-  // Expense Modal Elements (Phase 4)
+  // Expense Modal Elements
   const expenseModal = document.getElementById('expenseModal');
   const openAddExpenseBtn = document.getElementById('openAddExpenseBtn');
   const closeExpenseModalBtn = document.getElementById('closeExpenseModalBtn');
@@ -95,8 +116,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Initialize Page
   renderTripDetails();
+  initTripMap();
   renderItinerary();
   renderBudgetAndExpenses();
+  renderTripMap();
   setupEventListeners();
 
   // ==========================================================================
@@ -177,7 +200,138 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================================================
-  // 2. RENDER ITINERARY ACTIVITIES (GROUPED BY DAY / DATE)
+  // 2. PHASE 5: INTERACTIVE MAP & ROUTE VISUALIZATION (LEAFLET.JS)
+  // ==========================================================================
+  function initTripMap() {
+    if (!tripMapEl || typeof L === 'undefined') return;
+
+    try {
+      if (!leafletMap) {
+        leafletMap = L.map('tripMap', {
+          zoomControl: true,
+          scrollWheelZoom: false
+        }).setView([20.5937, 78.9629], 5); // Default view over India
+
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(leafletMap);
+
+        markersLayer = L.featureGroup().addTo(leafletMap);
+      }
+    } catch (e) {
+      console.warn('Map initialization note:', e);
+    }
+  }
+
+  function renderTripMap() {
+    if (!leafletMap || !markersLayer) return;
+
+    markersLayer.clearLayers();
+    activityMarkersMap = {};
+
+    currentTrip = Storage.getTripById(tripId);
+    if (!currentTrip) return;
+
+    const activities = currentTrip.itinerary || [];
+    const validPoints = [];
+
+    // Extract valid coordinates from itinerary items
+    activities.forEach((item, index) => {
+      const lat = parseFloat(item.latitude || item.lat);
+      const lng = parseFloat(item.longitude || item.lng);
+
+      if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        const pointData = {
+          lat,
+          lng,
+          id: item.id,
+          title: item.activity || 'Activity Location',
+          location: item.location || '',
+          date: item.date || '',
+          time: item.time || '',
+          notes: item.notes || '',
+          order: index + 1
+        };
+        validPoints.push(pointData);
+
+        // Create Leaflet Marker
+        const marker = L.marker([lat, lng]).addTo(markersLayer);
+        
+        // Popup Content
+        const popupContent = `
+          <div class="map-popup-card">
+            <div class="map-popup-title">#${index + 1} ${escapeHtml(pointData.title)}</div>
+            <div class="map-popup-meta">📍 ${escapeHtml(pointData.location)} ${pointData.time ? `• ⏰ ${formatTime(pointData.time)}` : ''}</div>
+            ${pointData.notes ? `<div class="map-popup-notes">${escapeHtml(pointData.notes)}</div>` : ''}
+          </div>
+        `;
+        marker.bindPopup(popupContent);
+
+        // Marker Click Listener -> Focus / Highlight corresponding Itinerary Card
+        marker.on('click', () => {
+          highlightItineraryCard(item.id);
+        });
+
+        activityMarkersMap[item.id] = marker;
+      }
+    });
+
+    // Draw sequenced route path if 2 or more coordinates exist
+    if (validPoints.length >= 2) {
+      const latLngs = validPoints.map(p => [p.lat, p.lng]);
+      L.polyline(latLngs, {
+        color: '#2563eb',
+        weight: 4,
+        opacity: 0.85,
+        dashArray: '6, 8'
+      }).addTo(markersLayer);
+    }
+
+    // Update Map Bounds & Empty State Handling
+    if (validPoints.length > 0) {
+      if (mapEmptyState) mapEmptyState.style.display = 'none';
+      if (tripMapEl) tripMapEl.style.height = '420px';
+      if (mapPointsBadge) mapPointsBadge.textContent = `${validPoints.length} location${validPoints.length === 1 ? '' : 's'} plotted`;
+      
+      try {
+        leafletMap.fitBounds(markersLayer.getBounds(), { padding: [45, 45], maxZoom: 14 });
+      } catch (e) {
+        leafletMap.setView([validPoints[0].lat, validPoints[0].lng], 11);
+      }
+    } else {
+      if (mapEmptyState) mapEmptyState.style.display = 'block';
+      if (mapPointsBadge) mapPointsBadge.textContent = '0 locations plotted';
+    }
+
+    // Trigger map invalidation for proper rendering
+    setTimeout(() => {
+      if (leafletMap) leafletMap.invalidateSize();
+    }, 200);
+  }
+
+  function focusMapOnActivity(activityId) {
+    if (!activityMarkersMap[activityId] || !leafletMap) return;
+    const marker = activityMarkersMap[activityId];
+    const latLng = marker.getLatLng();
+    leafletMap.setView(latLng, 14, { animate: true });
+    marker.openPopup();
+  }
+
+  function highlightItineraryCard(activityId) {
+    if (!itineraryDaysContainer) return;
+    itineraryDaysContainer.querySelectorAll('.activity-card').forEach(card => {
+      if (card.getAttribute('data-id') === String(activityId)) {
+        card.classList.add('is-active-marker');
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else {
+        card.classList.remove('is-active-marker');
+      }
+    });
+  }
+
+  // ==========================================================================
+  // 3. RENDER ITINERARY ACTIVITIES (GROUPED BY DAY / DATE)
   // ==========================================================================
   function renderItinerary() {
     if (!itineraryDaysContainer) return;
@@ -234,6 +388,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       dayActivities.forEach(item => {
         const timeDisplay = item.time ? formatTime(item.time) : 'Flexible Time';
+        const hasCoords = item.latitude && item.longitude;
 
         html += `
           <div class="activity-card" data-id="${escapeHtml(item.id)}">
@@ -244,6 +399,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <h4 class="activity-name">${escapeHtml(item.activity)}</h4>
               <div class="activity-location">
                 <span>📍</span> ${escapeHtml(item.location)}
+                ${hasCoords ? `<span style="color: var(--primary); font-size: 0.75rem; margin-left: 0.5rem; font-weight: 600;">(🗺️ On Map)</span>` : ''}
               </div>
               ${item.notes ? `<div class="activity-notes">${escapeHtml(item.notes)}</div>` : ''}
             </div>
@@ -268,16 +424,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
     itineraryDaysContainer.innerHTML = html;
 
+    // Attach Event Listeners to Activity Cards (Focus Map on Card Click)
+    itineraryDaysContainer.querySelectorAll('.activity-card').forEach(card => {
+      card.addEventListener('click', (e) => {
+        if (e.target.closest('.btn-icon')) return; // Ignore when clicking edit/delete
+        const actId = card.getAttribute('data-id');
+        highlightItineraryCard(actId);
+        focusMapOnActivity(actId);
+      });
+    });
+
     // Attach Event Listeners to Edit and Delete Buttons
     itineraryDaysContainer.querySelectorAll('.btn-edit-activity').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
         const actId = btn.getAttribute('data-id');
         openEditModal(actId);
       });
     });
 
     itineraryDaysContainer.querySelectorAll('.btn-delete-activity').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
         const actId = btn.getAttribute('data-id');
         handleDeleteActivity(actId);
       });
@@ -285,7 +453,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================================================
-  // 3. RENDER BUDGET TRACKING & EXPENSES (PHASE 4)
+  // 4. RENDER BUDGET TRACKING & EXPENSES (PHASE 4)
   // ==========================================================================
   function renderBudgetAndExpenses() {
     if (!budgetSummaryBox || !expensesContainer) return;
@@ -487,7 +655,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================================================
-  // 4. EVENT LISTENERS SETUP
+  // 5. EVENT LISTENERS SETUP
   // ==========================================================================
   function setupEventListeners() {
     // Activity Modal Listeners
@@ -505,7 +673,7 @@ document.addEventListener('DOMContentLoaded', () => {
       activityForm.addEventListener('submit', handleActivityFormSubmit);
     }
 
-    // Expense Modal Listeners (Phase 4)
+    // Expense Modal Listeners
     if (openAddExpenseBtn) openAddExpenseBtn.addEventListener('click', openAddExpenseModal);
     if (closeExpenseModalBtn) closeExpenseModalBtn.addEventListener('click', closeExpenseModal);
     if (cancelExpenseModalBtn) cancelExpenseModalBtn.addEventListener('click', closeExpenseModal);
@@ -530,7 +698,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================================================
-  // 5. ACTIVITY MODAL LOGIC
+  // 6. ACTIVITY MODAL LOGIC (WITH COORDINATES SUPPORT)
   // ==========================================================================
   function openAddModal() {
     if (!activityModal || !activityForm) return;
@@ -569,6 +737,8 @@ document.addEventListener('DOMContentLoaded', () => {
     activityTimeInput.value = activity.time || '';
     activityNameInput.value = activity.activity || '';
     activityLocationInput.value = activity.location || '';
+    activityLatInput.value = activity.latitude !== undefined ? activity.latitude : (activity.lat || '');
+    activityLngInput.value = activity.longitude !== undefined ? activity.longitude : (activity.lng || '');
     activityNotesInput.value = activity.notes || '';
 
     activityModal.classList.add('is-open');
@@ -592,6 +762,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const name = activityNameInput ? activityNameInput.value.trim() : '';
     const location = activityLocationInput ? activityLocationInput.value.trim() : '';
     const notes = activityNotesInput ? activityNotesInput.value.trim() : '';
+    const latStr = activityLatInput ? activityLatInput.value.trim() : '';
+    const lngStr = activityLngInput ? activityLngInput.value.trim() : '';
     const editingId = editingActivityIdInput ? editingActivityIdInput.value.trim() : '';
 
     if (!name) {
@@ -610,13 +782,38 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    let lat = null;
+    let lng = null;
+    if (latStr || lngStr) {
+      lat = parseFloat(latStr);
+      lng = parseFloat(lngStr);
+      if (isNaN(lat) || lat < -90 || lat > 90) {
+        showModalAlert('Latitude must be a valid number between -90 and 90.', 'danger');
+        if (activityLatInput) activityLatInput.focus();
+        return;
+      }
+      if (isNaN(lng) || lng < -180 || lng > 180) {
+        showModalAlert('Longitude must be a valid number between -180 and 180.', 'danger');
+        if (activityLngInput) activityLngInput.focus();
+        return;
+      }
+    }
+
     if (currentTrip && currentTrip.startDate && currentTrip.endDate) {
       if (date < currentTrip.startDate || date > currentTrip.endDate) {
         showModalAlert(`Note: Selected date (${formatDate(date)}) is outside your scheduled trip range (${formatDate(currentTrip.startDate)} – ${formatDate(currentTrip.endDate)}).`, 'warning');
       }
     }
 
-    const activityData = { date, time, activity: name, location, notes };
+    const activityData = {
+      date,
+      time,
+      activity: name,
+      location,
+      notes,
+      latitude: lat !== null ? lat : undefined,
+      longitude: lng !== null ? lng : undefined
+    };
 
     if (editingId) {
       Storage.updateItineraryItem(currentTrip.id, editingId, activityData);
@@ -628,6 +825,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     closeModal();
     renderItinerary();
+    renderTripMap();
   }
 
   function handleDeleteActivity(activityId) {
@@ -639,11 +837,12 @@ document.addEventListener('DOMContentLoaded', () => {
       Storage.deleteItineraryItem(currentTrip.id, activityId);
       showPageAlert('Activity deleted successfully.', 'warning');
       renderItinerary();
+      renderTripMap();
     }
   }
 
   // ==========================================================================
-  // 6. EXPENSE MODAL LOGIC (PHASE 4)
+  // 7. EXPENSE MODAL LOGIC
   // ==========================================================================
   function openAddExpenseModal() {
     if (!expenseModal || !expenseForm) return;
@@ -703,7 +902,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const notes = expenseNotesInput ? expenseNotesInput.value.trim() : '';
     const editingId = editingExpenseIdInput ? editingExpenseIdInput.value.trim() : '';
 
-    // Validation
     if (!title) {
       showExpenseModalAlert('Expense title is required.', 'danger');
       if (expenseTitleInput) expenseTitleInput.focus();
@@ -755,7 +953,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================================================
-  // 7. HELPER FUNCTIONS
+  // 8. HELPER FUNCTIONS
   // ==========================================================================
 
   function groupActivitiesByDate(activities) {
