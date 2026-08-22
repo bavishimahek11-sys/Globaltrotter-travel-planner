@@ -528,3 +528,245 @@ def delete_itinerary_item(itinerary_id):
     finally:
         conn.close()
 
+@api.route("/api/trips/<int:trip_id>/budget", methods=["PUT"])
+def update_trip_budget(trip_id):
+    data = request.get_json()
+
+    if not data:
+        return jsonify({
+            "error": "Request body is required"
+        }), 400
+
+    budget = data.get("budget")
+
+    if budget is None:
+        return jsonify({
+            "error": "Budget is required"
+        }), 400
+
+    try:
+        budget = float(budget)
+    except (TypeError, ValueError):
+        return jsonify({
+            "error": "Budget must be a number"
+        }), 400
+
+    if budget < 0:
+        return jsonify({
+            "error": "Budget cannot be negative"
+        }), 400
+
+    conn = get_db_connection()
+
+    try:
+        trip = conn.execute(
+            "SELECT id FROM trips WHERE id = ?",
+            (trip_id,)
+        ).fetchone()
+
+        if not trip:
+            return jsonify({
+                "error": "Trip not found"
+            }), 404
+
+        conn.execute("""
+            UPDATE trips
+            SET budget = ?
+            WHERE id = ?
+        """, (budget, trip_id))
+
+        conn.commit()
+
+        return jsonify({
+            "message": "Budget updated successfully",
+            "trip_id": trip_id,
+            "budget": budget
+        }), 200
+
+    finally:
+        conn.close()
+
+@api.route("/api/trips/<int:trip_id>/expenses", methods=["POST"])
+def add_expense(trip_id):
+    data = request.get_json()
+
+    if not data:
+        return jsonify({
+            "error": "Request body is required"
+        }), 400
+
+    category = data.get("category")
+    description = data.get("description")
+    amount = data.get("amount")
+    expense_date = data.get("expense_date")
+
+    if not category:
+        return jsonify({
+            "error": "Expense category is required"
+        }), 400
+
+    if amount is None:
+        return jsonify({
+            "error": "Expense amount is required"
+        }), 400
+
+    try:
+        amount = float(amount)
+    except (TypeError, ValueError):
+        return jsonify({
+            "error": "Amount must be a number"
+        }), 400
+
+    if amount <= 0:
+        return jsonify({
+            "error": "Expense amount must be greater than 0"
+        }), 400
+
+    conn = get_db_connection()
+
+    try:
+        trip = conn.execute(
+            "SELECT id FROM trips WHERE id = ?",
+            (trip_id,)
+        ).fetchone()
+
+        if not trip:
+            return jsonify({
+                "error": "Trip not found"
+            }), 404
+
+        cursor = conn.execute("""
+            INSERT INTO expenses (
+                trip_id,
+                category,
+                description,
+                amount,
+                expense_date
+            )
+            VALUES (?, ?, ?, ?, ?)
+        """, (
+            trip_id,
+            category,
+            description,
+            amount,
+            expense_date
+        ))
+
+        conn.commit()
+
+        return jsonify({
+            "message": "Expense added successfully",
+            "expense": {
+                "id": cursor.lastrowid,
+                "trip_id": trip_id,
+                "category": category,
+                "description": description,
+                "amount": amount,
+                "expense_date": expense_date
+            }
+        }), 201
+
+    finally:
+        conn.close()
+
+@api.route("/api/trips/<int:trip_id>/expenses", methods=["GET"])
+def get_expenses(trip_id):
+    conn = get_db_connection()
+
+    try:
+        trip = conn.execute(
+            "SELECT id FROM trips WHERE id = ?",
+            (trip_id,)
+        ).fetchone()
+
+        if not trip:
+            return jsonify({
+                "error": "Trip not found"
+            }), 404
+
+        expenses = conn.execute("""
+            SELECT
+                id,
+                trip_id,
+                category,
+                description,
+                amount,
+                expense_date,
+                created_at
+            FROM expenses
+            WHERE trip_id = ?
+            ORDER BY expense_date DESC, created_at DESC
+        """, (trip_id,)).fetchall()
+
+        return jsonify({
+            "expenses": [dict(expense) for expense in expenses]
+        }), 200
+
+    finally:
+        conn.close()
+
+@api.route("/api/expenses/<int:expense_id>", methods=["DELETE"])
+def delete_expense(expense_id):
+    conn = get_db_connection()
+
+    try:
+        expense = conn.execute(
+            "SELECT id FROM expenses WHERE id = ?",
+            (expense_id,)
+        ).fetchone()
+
+        if not expense:
+            return jsonify({
+                "error": "Expense not found"
+            }), 404
+
+        conn.execute(
+            "DELETE FROM expenses WHERE id = ?",
+            (expense_id,)
+        )
+
+        conn.commit()
+
+        return jsonify({
+            "message": "Expense deleted successfully"
+        }), 200
+
+    finally:
+        conn.close()
+
+@api.route("/api/trips/<int:trip_id>/budget-summary", methods=["GET"])
+def get_budget_summary(trip_id):
+    conn = get_db_connection()
+
+    try:
+        trip = conn.execute("""
+            SELECT id, budget
+            FROM trips
+            WHERE id = ?
+        """, (trip_id,)).fetchone()
+
+        if not trip:
+            return jsonify({
+                "error": "Trip not found"
+            }), 404
+
+        result = conn.execute("""
+            SELECT COALESCE(SUM(amount), 0) AS total_spent
+            FROM expenses
+            WHERE trip_id = ?
+        """, (trip_id,)).fetchone()
+
+        total_budget = float(trip["budget"] or 0)
+        total_spent = float(result["total_spent"] or 0)
+        remaining_budget = total_budget - total_spent
+
+        return jsonify({
+            "trip_id": trip_id,
+            "total_budget": total_budget,
+            "total_spent": total_spent,
+            "remaining_budget": remaining_budget
+        }), 200
+
+    finally:
+        conn.close()
+
